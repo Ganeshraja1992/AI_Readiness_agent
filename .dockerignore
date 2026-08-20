@@ -1,0 +1,22 @@
+.git/
+.github/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.DS_Store
+.flask_secret_key
+.env.docker
+.env.docker.example
+
+# Local-only runtime state — the webapp writes assessment history to
+# DynamoDB and connectors to SSM, not these; the CLI/tests use them, but
+# they shouldn't ship inside the image.
+local_audit/
+outbox/
+connectors/
+
+# Not needed inside the image
+tests/
+README.md

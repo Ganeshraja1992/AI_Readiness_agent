@@ -76,42 +76,76 @@ they default from config/env vars so the pipeline is runnable standalone.
 
 ## Web app (local demo UI)
 
-There's also a small Flask app (`webapp/`) with a login page and a home
-dashboard, for running/viewing assessments in a browser instead of the
-CLI. It's a thin wrapper around the same `AIReadinessAgent` — no
-persistence service, no state machine, no multi-tenant auth. It is
-**not** Member 3's Control Plane or Member 4's UI; it's a demo harness for
-this component.
+There's also a Flask app (`webapp/`) — a public landing page, a login-gated
+dashboard, and a 7-stage guided wizard — for running/viewing assessments in
+a browser instead of the CLI. It's a thin wrapper around the same
+`AIReadinessAgent`, but unlike the CLI's zero-AWS-account defaults, the
+webapp is AWS-backed: connectors live in SSM Parameter Store, assessment
+history in DynamoDB, and PII scanning adds a real Amazon Comprehend call
+alongside the regex heuristic. It is **not** Member 3's Control Plane or
+Member 4's UI; it's a demo harness for this component.
 
 ```bash
-pip install -r requirements.txt   # now includes Flask
+pip install -r requirements.txt   # now includes Flask + gunicorn
 python webapp/app.py
 # open http://127.0.0.1:5000
 ```
 
 Log in with `admin` / `changeme` (override via `WEBAPP_USERNAME` /
 `WEBAPP_PASSWORD` env vars — this is single-user session-cookie auth for a
-local demo, not production auth). From the home page you can:
-
-- pick an AI use case + environment ID and click **Run assessment** — it
-  runs the full ingest → profile → score → deliver pipeline synchronously
-  and redirects to a results dashboard (hero score, dimension meters,
-  findings, remediation, and the exact `ControlPlanePayload` JSON that was
-  signed and delivered).
-- see a table of past runs, read back from `local_audit/` (each row links
-  to its results page).
+local demo, not production auth). From the dashboard you can start the
+wizard: select an AI use case, then independently scan an S3 bucket, run
+an S3 security check, scan an RDS database, or assess uploaded documents —
+each produces its own result, walked through Analyze → Calculate →
+Blockers → Remediation → Projected.
 
 Other env vars: `WEBAPP_PORT` (default `5000`), `WEBAPP_DEBUG` (default
 `true` — set `false` outside local dev), `WEBAPP_SECRET_KEY` (session
-signing key; a random one is generated per process start if unset, which
-means sessions won't survive a restart — set this explicitly if that
-matters to you).
+signing key; if unset, a generated key persists to a local
+`.flask_secret_key` file so restarts don't drop sessions).
 
 Since ingestion runs synchronously inside the request, a real (non-mock)
 scan against large S3/RDS sources would need to move to a background job
 — that's a deliberate simplification for this demo, consistent with the
 spec's note that the *real* Control Plane must not block the HTTP request
 on a long scan.
+
+## Docker
+
+The webapp also runs as a container, served by gunicorn instead of Flask's
+dev server. The image doesn't bundle AWS or Anthropic credentials — you
+supply those at run time.
+
+```bash
+docker build -t ai-readiness-agent .
+
+docker run -p 5000:5000 \
+  -e WEBAPP_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(24))')" \
+  -e WEBAPP_USERNAME=admin -e WEBAPP_PASSWORD=changeme \
+  -e AWS_REGION=us-east-1 \
+  -v ~/.aws:/home/appuser/.aws:ro \
+  ai-readiness-agent
+# open http://localhost:5000
+```
+
+The `~/.aws` mount reuses your existing credentials/SSO session (an
+assumed role from `aws sso login` works fine) so the container can reach
+S3, RDS, SSM, DynamoDB, and Comprehend. Add `-e ANTHROPIC_API_KEY=...` to
+enable the LLM content-analysis dimension.
+
+Or with Compose, which wires up the same mount and reads env vars from a
+file instead of a long `-e` list:
+
+```bash
+cp .env.docker.example .env.docker   # fill in your values
+docker compose up --build
+```
+
+`WEBAPP_SECRET_KEY` is worth setting explicitly for Docker even though the
+app falls back to a persisted file — that file lives inside the
+container's writable layer, so it won't survive `docker run` recreating
+the container (only `docker start`/`stop` of the *same* container keeps
+it).
 
 ## Running the tests
 

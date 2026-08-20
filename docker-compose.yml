@@ -1,0 +1,19 @@
+# Optional convenience wrapper around `docker build` / `docker run` — see
+# README.md's Docker section for the equivalent plain `docker run` command.
+#
+# Usage:
+#   cp .env.docker.example .env.docker   # fill in your values
+#   docker compose up --build
+
+services:
+  webapp:
+    build: .
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env.docker
+    volumes:
+      # Read-only mount of your AWS credentials/SSO cache so the container
+      # can reach S3/RDS/SSM/DynamoDB/Comprehend with your existing
+      # `aws sso login` session or ~/.aws/credentials.
+      - ${HOME}/.aws:/home/appuser/.aws:ro

@@ -8,4 +8,5 @@ connectors/
 venv/
 .DS_Store
 .env
+.env.docker
 .flask_secret_key

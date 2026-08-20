@@ -36,9 +36,12 @@ import sys
 import uuid
 from pathlib import Path
 
-# Let this run as `python webapp/app.py` without requiring the package to
-# be pip-installed or PYTHONPATH set by hand.
+# Let this run as `python webapp/app.py` (script directory is auto-added
+# to sys.path) or imported as `webapp.app:app` under gunicorn (it isn't) —
+# add both `src/` and this directory explicitly so `connectors` and
+# `ai_readiness_agent` resolve either way.
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(ROOT / "src"))
 
 from flask import Flask, redirect, render_template, request, session, url_for  # noqa: E402
