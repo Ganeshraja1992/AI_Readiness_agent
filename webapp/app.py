@@ -366,7 +366,10 @@ def run_assessment():
             return _error("No S3 connector configured. Connect a bucket above first.")
         _apply_s3_connector(config, connector)
         sources = {"s3"}
-        s3_include_data = action == "s3"
+        # Both actions list bucket records; "security" additionally runs the
+        # bucket-config checks (public access/encryption/versioning) so its
+        # Analyze Data Estate page isn't empty.
+        s3_include_data = True
         s3_include_security = action == "security"
     elif action == "rds":
         connector = connectors.load_rds_connector()

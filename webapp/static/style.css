@@ -648,6 +648,26 @@ details.raw-payload pre {
   margin-top: var(--space-1);
 }
 
+/* A solid, opaque banner (not translucent) for context that sits directly
+   on the page background photo, outside any .card — plain text there reads
+   as blurry/washed out against the image. */
+.context-banner {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: var(--surface-1);
+  border: 1px solid var(--accent-violet);
+  border-left: 3px solid var(--accent-violet);
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+}
+.context-banner strong { color: var(--text-primary); }
+
 /* --- Loading overlay (shown while a POST that hits real AWS is in
    flight — S3/Comprehend/RDS/LLM calls can take a few seconds) --- */
 #loading-overlay {

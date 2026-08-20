@@ -6,7 +6,7 @@
 
 {% if error %}<div class="error-banner" role="alert">{{ error }}</div>{% endif %}
 
-<p class="small-note">
+<p class="context-banner">
   Use case: <strong>{{ use_case }}</strong> &middot; Environment: <strong>{{ environment_id }}</strong>
   &middot; <a href="{{ url_for('wizard_step1') }}">change</a>
 </p>
