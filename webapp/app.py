@@ -50,8 +50,24 @@ from ai_readiness_agent.agent import AIReadinessAgent  # noqa: E402
 from ai_readiness_agent.config import load_config  # noqa: E402
 from ai_readiness_agent.engine import rules  # noqa: E402
 
+def _resolve_secret_key() -> str:
+    """WEBAPP_SECRET_KEY wins if set. Otherwise, persist a generated key to
+    a local file instead of regenerating one on every process start —
+    the debug reloader restarts this process on every file save, and a
+    fresh random key each time invalidates every logged-in session."""
+    env_key = os.environ.get("WEBAPP_SECRET_KEY")
+    if env_key:
+        return env_key
+    key_path = ROOT / ".flask_secret_key"
+    if key_path.exists():
+        return key_path.read_text().strip()
+    key = os.urandom(24).hex()
+    key_path.write_text(key)
+    return key
+
+
 app = Flask(__name__)
-app.secret_key = os.environ.get("WEBAPP_SECRET_KEY", os.urandom(24).hex())
+app.secret_key = _resolve_secret_key()
 
 WEBAPP_USERNAME = os.environ.get("WEBAPP_USERNAME", "admin")
 WEBAPP_PASSWORD = os.environ.get("WEBAPP_PASSWORD", "changeme")
