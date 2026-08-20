@@ -1,53 +1,108 @@
 {% extends "base.html" %}
-{% block title %}Home — AI Readiness Agent{% endblock %}
+{% block title %}AI Readiness Agent{% endblock %}
 {% block content %}
 
-{% if error %}<div class="error-banner" role="alert">{{ error }}</div>{% endif %}
-
-<div class="card">
-  <h2>New assessment</h2>
-  <p class="small-note">
-    Walk through the guided flow: select an AI use case, connect your data
-    (S3 bucket, security scan, or uploaded documents), and see the full
-    readiness breakdown &mdash; blockers, remediation plan, and projected score.
+<div class="card landing-hero">
+  <p class="eyebrow-note">Data readiness assessment</p>
+  <h1 class="landing-title">Is your data actually ready for that AI use case?</h1>
+  <p class="landing-lede">
+    AI Readiness Agent scans your real S3 buckets, RDS databases, and
+    documents, and scores them across seven dimensions &mdash; completeness,
+    privacy risk, security posture, and more &mdash; before you build an AI
+    system on top of them.
   </p>
-  <a class="button-link" href="{{ url_for('wizard_step1') }}">Start new assessment &rarr;</a>
+  <div class="button-row landing-cta">
+    {% if user %}
+      <a class="button-link" href="{{ url_for('dashboard') }}">Go to dashboard &rarr;</a>
+    {% else %}
+      <a class="button-link" href="{{ url_for('login') }}">Log in &rarr;</a>
+    {% endif %}
+  </div>
 </div>
 
 <div class="card">
-  <h2>Past assessments</h2>
-  {% if assessments %}
-  <table>
-    <thead>
-      <tr>
-        <th scope="col">Assessment</th>
-        <th scope="col">Use case</th>
-        <th scope="col">Environment</th>
-        <th scope="col">Score</th>
-        <th scope="col">Status</th>
-        <th scope="col">Run at</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for a in assessments %}
-      <tr>
-        <td><a href="{{ url_for('view_assessment', assessment_id=a.assessment_id) }}" aria-label="View assessment {{ a.assessment_id }}">{{ a.assessment_id[:8] }}&hellip;</a></td>
-        <td>{{ a.use_case }}</td>
-        <td>{{ a.environment_id }}</td>
-        <td>{{ a.overall_score }}</td>
-        <td>
-          <span class="badge badge-{{ a.readiness_level | readiness_badge }}">
-            <span class="dot"></span>{{ a.readiness_level }}
-          </span>
-        </td>
-        <td>{{ a.generated_at.strftime('%Y-%m-%d %H:%M') }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="empty-state">No assessments run yet &mdash; use the button above to run the first one.</p>
-  {% endif %}
+  <h2>What it does</h2>
+  <div class="stat-grid landing-capabilities">
+    <div class="stat-tile">
+      <div class="stat-label-lg">Real AWS integration</div>
+      <p class="small-note">
+        Scans real S3 buckets and RDS/PostgreSQL databases &mdash; not mock
+        data. Connector config lives in AWS SSM Parameter Store; assessment
+        history lives in DynamoDB.
+      </p>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-label-lg">Dual-layer PII detection</div>
+      <p class="small-note">
+        A fast regex heuristic runs alongside Amazon Comprehend&rsquo;s
+        NLP-based DetectPiiEntities on S3 and document content, so
+        sensitive data does not slip past pattern-matching alone.
+      </p>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-label-lg">Optional LLM judgment</div>
+      <p class="small-note">
+        With an Anthropic API key configured, the Claude API samples
+        ingested content to catch sensitive-data nuance, quality issues,
+        and use-case fit that rules cannot.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>How it works &mdash; 7 stages</h2>
+  <ol class="workflow-list">
+    <li class="workflow-step">
+      <span class="workflow-num">1</span>
+      <div>
+        <div class="workflow-title">Select AI use case</div>
+        <p class="small-note">Choose what you&rsquo;re evaluating for &mdash; e.g. a customer support agent or a fraud detection model. This decides how the 7 scoring dimensions get weighted later.</p>
+      </div>
+    </li>
+    <li class="workflow-step">
+      <span class="workflow-num">2</span>
+      <div>
+        <div class="workflow-title">Connect / upload data</div>
+        <p class="small-note">Point at a real S3 bucket, an RDS database, or upload documents directly. Four independent actions: scan S3, run a bucket security check, scan RDS, or assess documents.</p>
+      </div>
+    </li>
+    <li class="workflow-step">
+      <span class="workflow-num">3</span>
+      <div>
+        <div class="workflow-title">Analyze data estate</div>
+        <p class="small-note">See exactly what was ingested &mdash; sources, record counts, and any ingestion errors.</p>
+      </div>
+    </li>
+    <li class="workflow-step">
+      <span class="workflow-num">4</span>
+      <div>
+        <div class="workflow-title">Calculate AI readiness</div>
+        <p class="small-note">A weighted score across completeness, uniqueness, volume, freshness, privacy risk, security, and AI-content fit.</p>
+      </div>
+    </li>
+    <li class="workflow-step">
+      <span class="workflow-num">5</span>
+      <div>
+        <div class="workflow-title">Identify critical blockers</div>
+        <p class="small-note">Every finding that needs attention before this data should power an AI system, ranked by severity.</p>
+      </div>
+    </li>
+    <li class="workflow-step">
+      <span class="workflow-num">6</span>
+      <div>
+        <div class="workflow-title">Generate remediation plan</div>
+        <p class="small-note">Concrete next steps, each with an effort estimate and a projected score gain.</p>
+      </div>
+    </li>
+    <li class="workflow-step">
+      <span class="workflow-num">7</span>
+      <div>
+        <div class="workflow-title">Show projected readiness</div>
+        <p class="small-note">What your score would look like after applying the suggested fixes &mdash; plus the exact minimal payload that would be signed and delivered onward.</p>
+      </div>
+    </li>
+  </ol>
 </div>
 
 {% endblock %}

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — AI Readiness Agent{% endblock %}
+{% block content %}
+
+{% if error %}<div class="error-banner" role="alert">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <h2>Dashboard</h2>
+  {% if stats.total == 0 %}
+    <p class="empty-state">Run your first assessment to see stats here.</p>
+  {% else %}
+    <div class="stat-grid">
+      <div class="stat-tile">
+        <div class="stat-figure">{{ stats.total }}</div>
+        <div class="stat-label">Total assessments</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-figure">{{ stats.avg_score }}</div>
+        <div class="stat-label">Average score</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-figure stat-figure-good">{{ stats.level_counts.AI_READY }}</div>
+        <div class="stat-label">AI-ready runs</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-figure stat-figure-critical">{{ stats.needs_attention }}</div>
+        <div class="stat-label">Needs attention</div>
+      </div>
+    </div>
+
+    <div class="dashboard-row">
+      <div class="dashboard-col">
+        <div class="dist-label">Readiness distribution</div>
+        <div class="dist-bar" role="img" aria-label="Readiness distribution: {{ stats.level_counts.NOT_READY }} not ready, {{ stats.level_counts.NEEDS_WORK }} needs work, {{ stats.level_counts.READY }} ready, {{ stats.level_counts.AI_READY }} AI-ready">
+          {% if stats.level_pct.NOT_READY %}<span class="dist-seg dist-not-ready" style="width: {{ stats.level_pct.NOT_READY }}%;"></span>{% endif %}
+          {% if stats.level_pct.NEEDS_WORK %}<span class="dist-seg dist-needs-work" style="width: {{ stats.level_pct.NEEDS_WORK }}%;"></span>{% endif %}
+          {% if stats.level_pct.READY %}<span class="dist-seg dist-ready" style="width: {{ stats.level_pct.READY }}%;"></span>{% endif %}
+          {% if stats.level_pct.AI_READY %}<span class="dist-seg dist-ai-ready" style="width: {{ stats.level_pct.AI_READY }}%;"></span>{% endif %}
+        </div>
+        <div class="dist-legend">
+          <span><i class="dist-dot dist-not-ready"></i>Not ready ({{ stats.level_counts.NOT_READY }})</span>
+          <span><i class="dist-dot dist-needs-work"></i>Needs work ({{ stats.level_counts.NEEDS_WORK }})</span>
+          <span><i class="dist-dot dist-ready"></i>Ready ({{ stats.level_counts.READY }})</span>
+          <span><i class="dist-dot dist-ai-ready"></i>AI-ready ({{ stats.level_counts.AI_READY }})</span>
+        </div>
+      </div>
+
+      {% if stats.trend_last %}
+      <div class="dashboard-col">
+        <div class="dist-label">Score trend (last {{ stats.trend_count }} run{{ 's' if stats.trend_count != 1 else '' }})</div>
+        <svg class="sparkline" viewBox="0 0 400 80" role="img" aria-label="Overall score trend across recent assessments, oldest to newest, ending at {{ stats.avg_score }}">
+          <polyline points="{{ stats.trend_points }}" />
+          <circle cx="{{ stats.trend_last[0] }}" cy="{{ stats.trend_last[1] }}" r="4" class="sparkline-endpoint" />
+        </svg>
+      </div>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>New assessment</h2>
+  <p class="small-note">
+    Walk through the guided flow: select an AI use case, connect your data
+    (S3 bucket, security scan, or uploaded documents), and see the full
+    readiness breakdown &mdash; blockers, remediation plan, and projected score.
+  </p>
+  <a class="button-link" href="{{ url_for('wizard_step1') }}">Start new assessment &rarr;</a>
+</div>
+
+<div class="card">
+  <h2>Past assessments</h2>
+  {% if assessments %}
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Assessment</th>
+        <th scope="col">Use case</th>
+        <th scope="col">Environment</th>
+        <th scope="col">Score</th>
+        <th scope="col">Status</th>
+        <th scope="col">Run at</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in assessments %}
+      <tr>
+        <td><a href="{{ url_for('view_assessment', assessment_id=a.assessment_id) }}" aria-label="View assessment {{ a.assessment_id }}">{{ a.assessment_id[:8] }}&hellip;</a></td>
+        <td>{{ a.use_case }}</td>
+        <td>{{ a.environment_id }}</td>
+        <td>{{ a.overall_score }}</td>
+        <td>
+          <span class="badge badge-{{ a.readiness_level | readiness_badge }}">
+            <span class="dot"></span>{{ a.readiness_level }}
+          </span>
+        </td>
+        <td>{{ a.generated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state">No assessments run yet &mdash; use the button above to run the first one.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

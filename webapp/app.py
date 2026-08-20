@@ -158,7 +158,7 @@ def login_required(view):
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if session.get("user"):
-        return redirect(url_for("home"))
+        return redirect(url_for("dashboard"))
 
     error = None
     if request.method == "POST":
@@ -166,7 +166,7 @@ def login():
         password = request.form.get("password", "")
         if username == WEBAPP_USERNAME and password == WEBAPP_PASSWORD:
             session["user"] = username
-            next_url = request.args.get("next") or url_for("home")
+            next_url = request.args.get("next") or url_for("dashboard")
             return redirect(next_url)
         error = "Incorrect username or password."
     return render_template("login.html", error=error)
@@ -178,11 +178,73 @@ def logout():
     return redirect(url_for("login"))
 
 
+_LEVEL_ORDER = ["NOT_READY", "NEEDS_WORK", "READY", "AI_READY"]
+_TREND_MAX_POINTS = 15
+_SPARKLINE_W, _SPARKLINE_H, _SPARKLINE_PAD = 400, 80, 10
+
+
+def _dashboard_stats(assessments: list[dict]) -> dict:
+    """Summary stats + a trend sparkline for the home page dashboard, all
+    derived from the same list_audits() rows the history table already
+    renders -- no extra DynamoDB reads."""
+    level_counts = {lvl: 0 for lvl in _LEVEL_ORDER}
+    total = len(assessments)
+    if total == 0:
+        return {
+            "total": 0,
+            "avg_score": 0,
+            "level_counts": level_counts,
+            "level_pct": {lvl: 0 for lvl in _LEVEL_ORDER},
+            "needs_attention": 0,
+            "trend_points": "",
+            "trend_last": None,
+            "trend_count": 0,
+        }
+
+    for a in assessments:
+        level_counts[a["readiness_level"]] = level_counts.get(a["readiness_level"], 0) + 1
+    avg_score = round(sum(a["overall_score"] for a in assessments) / total)
+    level_pct = {lvl: round(count * 100 / total) for lvl, count in level_counts.items()}
+
+    trend_source = sorted(assessments, key=lambda a: a["generated_at"])[-_TREND_MAX_POINTS:]
+    n = len(trend_source)
+    w, h, pad = _SPARKLINE_W, _SPARKLINE_H, _SPARKLINE_PAD
+    if n == 1:
+        x, y = w / 2, pad + (1 - trend_source[0]["overall_score"] / 100) * (h - 2 * pad)
+        points = [(x, y)]
+    else:
+        step = (w - 2 * pad) / (n - 1)
+        points = [
+            (pad + i * step, pad + (1 - t["overall_score"] / 100) * (h - 2 * pad))
+            for i, t in enumerate(trend_source)
+        ]
+
+    return {
+        "total": total,
+        "avg_score": avg_score,
+        "level_counts": level_counts,
+        "level_pct": level_pct,
+        "needs_attention": level_counts["NOT_READY"] + level_counts["NEEDS_WORK"],
+        "trend_points": " ".join(f"{x:.1f},{y:.1f}" for x, y in points),
+        "trend_last": points[-1],
+        "trend_count": n,
+    }
+
+
 @app.route("/")
-@login_required
 def home():
+    """Public landing page — explains the product and the 7-stage
+    workflow. No login required; logged-in visitors get a "Go to
+    dashboard" CTA instead of "Log in"."""
+    return render_template("home.html", user=session.get("user"))
+
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
     assessments = audit_store.list_audits(_config())
-    return render_template("home.html", user=session.get("user"), assessments=assessments)
+    stats = _dashboard_stats(assessments)
+    return render_template("dashboard.html", user=session.get("user"), assessments=assessments, stats=stats)
 
 
 # ----------------------------------------------------------------------
@@ -434,7 +496,7 @@ def wizard_result(assessment_id: str, stage: str):
 
     result = _load_assessment(assessment_id)
     if not result:
-        return redirect(url_for("home"))
+        return redirect(url_for("dashboard"))
 
     idx = RESULT_STAGES.index(stage)
     prev_stage = RESULT_STAGES[idx - 1] if idx > 0 else None
@@ -462,9 +524,10 @@ def view_assessment(assessment_id: str):
     if not result:
         assessments = audit_store.list_audits(_config())
         return render_template(
-            "home.html",
+            "dashboard.html",
             user=session.get("user"),
             assessments=assessments,
+            stats=_dashboard_stats(assessments),
             error=f"No assessment found for {assessment_id}.",
         ), 404
 
