@@ -1,0 +1,8 @@
+[
+  {"order_id": "ORD-1001", "customer_id": "C-01", "amount": 129.99, "currency": "USD", "status": "completed", "created_at": "2026-07-01T10:15:00Z"},
+  {"order_id": "ORD-1002", "customer_id": "C-02", "amount": 59.5, "currency": "USD", "status": "completed", "created_at": "2026-07-02T11:00:00Z"},
+  {"order_id": "ORD-1003", "customer_id": "C-03", "amount": null, "currency": "USD", "status": "pending", "created_at": "2026-07-03T09:30:00Z"},
+  {"order_id": "ORD-1004", "customer_id": "C-01", "amount": 249.0, "currency": "", "status": "completed", "created_at": "2026-07-05T14:45:00Z"},
+  {"order_id": "ORD-1005", "customer_id": "C-04", "amount": 15.25, "currency": "USD", "status": "refunded", "created_at": "2026-07-06T08:00:00Z"},
+  {"order_id": "ORD-1001", "customer_id": "C-01", "amount": 129.99, "currency": "USD", "status": "completed", "created_at": "2026-07-01T10:15:00Z"}
+]

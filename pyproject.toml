@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-readiness-agent"
+version = "0.1.0"
+description = "AI Readiness Agent: ingests customer AWS data (S3/RDS/Documents), profiles it, scores AI readiness, and securely hands results to the Control Plane."
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.5",
+    "boto3>=1.34",
+    "SQLAlchemy>=2.0",
+    "requests>=2.31",
+    "PyYAML>=6.0",
+]
+
+[project.scripts]
+ai-readiness = "ai_readiness_agent.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

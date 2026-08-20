@@ -1,0 +1,9 @@
+id,full_name,email,phone,plan,signup_date,lifetime_value,country
+1,Alice Nguyen,alice@example.com,555-0101,pro,2024-01-15,1899.50,US
+2,Bob Smith,bob@example.com,,pro,2024-02-20,450.00,US
+3,Carol Diaz,carol@example.com,555-0103,free,2024-03-05,0.00,MX
+4,Dave Okoye,dave@example.com,555-0104,pro,2023-11-30,3120.75,NG
+5,Eve Larsen,,555-0105,enterprise,2022-08-12,15230.00,SE
+6,Frank Kim,frank@example.com,555-0106,free,2025-01-02,0.00,KR
+7,Alice Nguyen,alice@example.com,555-0101,pro,2024-01-15,1899.50,US
+8,Grace Patel,grace@example.com,555-0108,enterprise,2021-05-19,42000.10,IN

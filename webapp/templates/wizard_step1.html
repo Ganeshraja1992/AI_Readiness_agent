@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Select Use Case — AI Readiness Agent{% endblock %}
+{% block content %}
+
+{% include "_stepper.html" %}
+
+<div class="card">
+  <h2>1. Select AI use case</h2>
+  <form method="get" action="{{ url_for('wizard_step2') }}">
+    <label for="use_case">AI use case</label>
+    <select id="use_case" name="use_case">
+      {% for uc in use_cases %}
+        <option value="{{ uc }}" {% if uc == default_use_case %}selected{% endif %}>{{ uc }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="environment_id">Environment ID</label>
+    <input type="text" id="environment_id" name="environment_id" value="{{ default_environment_id }}">
+
+    <button type="submit">Next: Connect / Upload data &rarr;</button>
+  </form>
+  <p class="small-note">
+    The use case selected here determines how the Readiness Engine weights each
+    scoring dimension &mdash; e.g. a customer-support agent weighs privacy risk and
+    security more heavily than a sales forecasting model.
+  </p>
+</div>
+
+{% endblock %}

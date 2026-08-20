@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}AI Readiness Agent{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  {% block body %}
+  <div class="topbar">
+    <div class="brand">AI Readiness Agent <small>local demo</small></div>
+    <nav aria-label="Primary">
+      {% if user %}
+        <a href="{{ url_for('home') }}">Home</a>
+        <a href="{{ url_for('logout') }}">Log out ({{ user }})</a>
+      {% endif %}
+    </nav>
+  </div>
+  <main class="container" id="main-content">
+    {% block content %}{% endblock %}
+  </main>
+  {% endblock %}
+
+  <div id="loading-overlay" aria-hidden="true">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <p>Working&hellip; real AWS calls can take a few seconds.</p>
+      <div class="skeleton-line"></div>
+      <div class="skeleton-line"></div>
+      <div class="skeleton-line"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var overlay = document.getElementById("loading-overlay");
+
+      // Show a loading overlay + disable the clicked submit button for any
+      // POST form (login, save/delete connectors, run assessment actions) —
+      // these can hit real S3/Comprehend/RDS/Anthropic calls that take a
+      // few seconds, so give feedback instead of looking frozen, and guard
+      // against double-submits.
+      document.addEventListener("submit", function (evt) {
+        var form = evt.target;
+        if (form.tagName !== "FORM" || form.method.toLowerCase() !== "post") return;
+        overlay.classList.add("visible");
+        var submitter = evt.submitter;
+        if (submitter) {
+          setTimeout(function () {
+            submitter.classList.add("is-loading");
+            submitter.disabled = true;
+          }, 0);
+        }
+      });
+
+      // Progressive enhancement: animate each meter bar in from 0 on load
+      // rather than appearing instantly. Skipped for reduced-motion users;
+      // degrades to the existing static inline width with JS disabled.
+      var reduceMotion = window.matchMedia
+        && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!reduceMotion) {
+        document.querySelectorAll(".meter-fill").forEach(function (el) {
+          var target = el.style.width;
+          if (!target) return;
+          el.style.width = "0%";
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              el.style.transition = "width 0.6s cubic-bezier(.22,.61,.36,1)";
+              el.style.width = target;
+            });
+          });
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+<nav class="stepper" aria-label="Assessment progress">
+  {% for key, label in stepper_stages %}
+  <div class="stepper-item {% if loop.index0 < stepper_current_index %}done{% elif loop.index0 == stepper_current_index %}current{% endif %}"
+       {% if loop.index0 == stepper_current_index %}aria-current="step"{% endif %}>
+    <span class="stepper-num" aria-hidden="true">{{ loop.index }}</span>
+    <span class="stepper-label">{{ label }}</span>
+  </div>
+  {% if not loop.last %}<span class="stepper-arrow" aria-hidden="true">&rarr;</span>{% endif %}
+  {% endfor %}
+</nav>

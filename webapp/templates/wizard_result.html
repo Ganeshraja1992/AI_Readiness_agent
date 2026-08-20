@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}{{ stage_label }} — AI Readiness Agent{% endblock %}
+{% block content %}
+
+{% include "_stepper.html" %}
+
+{% if stage in ("readiness", "blockers", "remediation") %}
+<div class="card hero">
+  <div class="hero-figure">{{ result.overall_score | round | int }}</div>
+  <div class="hero-meta">
+    <div class="label">{{ stage_label }} &middot; use case: {{ result.use_case }} &middot; env: {{ result.environment_id }}</div>
+    <span class="badge badge-{{ result.readiness_level.value | readiness_badge }}">
+      <span class="dot"></span>{{ result.readiness_level.value }}
+    </span>
+  </div>
+</div>
+{% endif %}
+
+{% if stage == "analyze" %}
+<div class="card">
+  <h2>3. Analyze Data Estate</h2>
+  <table>
+    <thead><tr><th scope="col">Source</th><th scope="col">Type</th><th scope="col">Records</th><th scope="col">Errors</th></tr></thead>
+    <tbody>
+      {% for s in result.data_profile.sources %}
+      <tr>
+        <td>{{ s.source_name }}</td>
+        <td>{{ s.source_type }}</td>
+        <td>{{ s.record_count }}</td>
+        <td>{{ s.ingestion_errors | length }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="small-note">
+    {{ result.data_profile.total_records }} total record(s) across
+    {{ result.data_profile.sources | length }} source(s).
+  </p>
+</div>
+
+{% elif stage == "readiness" %}
+<div class="card">
+  <h2>4. Calculate AI Readiness</h2>
+  {% for d in result.dimension_scores %}
+  <div class="meter-row">
+    <div class="meter-name">{{ d.name | dimension_label }}</div>
+    <div class="meter-track"><div class="meter-fill" style="width: {{ d.score }}%;"></div></div>
+    <div class="meter-value">{{ d.score | round | int }}</div>
+    <div class="meter-summary">{{ d.summary }} (weight {{ (d.weight * 100) | round | int }}%)</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% elif stage == "blockers" %}
+<div class="card">
+  <h2>5. Identify Critical Blockers ({{ critical_findings | length }})</h2>
+  {% if critical_findings %}
+    {% for f in critical_findings %}
+    <div class="finding">
+      <span class="badge badge-{{ f.severity | severity_badge }}"><span class="dot"></span>{{ f.severity }}</span>
+      <div class="finding-title">{{ f.title }}</div>
+      <div class="finding-impact">{{ f.impact }}</div>
+      {% if f.source %}<div class="small-note">source: {{ f.source }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty-state">No critical or warning-level blockers found.</p>
+  {% endif %}
+</div>
+
+{% elif stage == "remediation" %}
+<div class="card">
+  <h2>6. Generate Remediation Plan</h2>
+  {% if result.remediation %}
+    {% for r in result.remediation %}
+    <div class="remediation">
+      <div class="remediation-action">{{ r.action }}</div>
+      <div class="remediation-meta">effort: {{ r.effort }} &middot; projected score gain: +{{ r.projected_score_delta }}</div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty-state">No remediation needed — all dimensions scored 85+.</p>
+  {% endif %}
+</div>
+
+{% elif stage == "projected" %}
+<div class="card hero">
+  <div class="hero-figure">{{ result.overall_score | round | int }} &rarr; {{ result.projected_score | round | int }}</div>
+  <div class="hero-meta">
+    <div class="label">7. Show Projected Readiness &middot; use case: {{ result.use_case }}</div>
+    <div class="small-note">Projected score after applying the suggested remediation plan above.</div>
+  </div>
+</div>
+<div class="card">
+  <h2>Secure Result Channel</h2>
+  <p class="small-note">
+    This is the exact <code>ControlPlanePayload</code> that was signed and delivered to
+    Member 3's Control Plane (or the local outbox). It contains no raw record values or
+    sample data — only these aggregate scores, findings, and remediation actions.
+  </p>
+  <details class="raw-payload">
+    <summary>View payload JSON</summary>
+    <pre>{{ payload_json }}</pre>
+  </details>
+</div>
+{% endif %}
+
+<div class="wizard-nav">
+  {% if prev_stage %}
+    <a href="{{ url_for('wizard_result', assessment_id=result.assessment_id, stage=prev_stage) }}">&larr; Back</a>
+  {% else %}
+    <a href="{{ url_for('wizard_step2') }}">&larr; Back to connect data</a>
+  {% endif %}
+  {% if next_stage %}
+    <a class="button-link" href="{{ url_for('wizard_result', assessment_id=result.assessment_id, stage=next_stage) }}">Next &rarr;</a>
+  {% else %}
+    <span>
+      <a href="{{ url_for('view_assessment', assessment_id=result.assessment_id) }}">View full report</a>
+      &middot;
+      <a class="button-link" href="{{ url_for('home') }}">Finish</a>
+    </span>
+  {% endif %}
+</div>
+
+{% endblock %}

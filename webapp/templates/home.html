@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Home — AI Readiness Agent{% endblock %}
+{% block content %}
+
+{% if error %}<div class="error-banner" role="alert">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <h2>New assessment</h2>
+  <p class="small-note">
+    Walk through the guided flow: select an AI use case, connect your data
+    (S3 bucket, security scan, or uploaded documents), and see the full
+    readiness breakdown &mdash; blockers, remediation plan, and projected score.
+  </p>
+  <a class="button-link" href="{{ url_for('wizard_step1') }}">Start new assessment &rarr;</a>
+</div>
+
+<div class="card">
+  <h2>Past assessments</h2>
+  {% if assessments %}
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Assessment</th>
+        <th scope="col">Use case</th>
+        <th scope="col">Environment</th>
+        <th scope="col">Score</th>
+        <th scope="col">Status</th>
+        <th scope="col">Run at</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in assessments %}
+      <tr>
+        <td><a href="{{ url_for('view_assessment', assessment_id=a.assessment_id) }}" aria-label="View assessment {{ a.assessment_id }}">{{ a.assessment_id[:8] }}&hellip;</a></td>
+        <td>{{ a.use_case }}</td>
+        <td>{{ a.environment_id }}</td>
+        <td>{{ a.overall_score }}</td>
+        <td>
+          <span class="badge badge-{{ a.readiness_level | readiness_badge }}">
+            <span class="dot"></span>{{ a.readiness_level }}
+          </span>
+        </td>
+        <td>{{ a.generated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state">No assessments run yet &mdash; use the button above to run the first one.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

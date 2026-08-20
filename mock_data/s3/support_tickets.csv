@@ -1,0 +1,6 @@
+ticket_id,customer_email,subject,priority,status,created_at
+T-500,alice@example.com,Login issue,high,open,2026-06-20
+T-501,bob@example.com,Billing question,low,closed,2026-06-21
+T-502,,Feature request,medium,open,2026-06-22
+T-503,carol@example.com,App crash on export,high,open,2026-06-23
+T-504,dave@example.com,Cannot reset password,medium,closed,2026-06-24

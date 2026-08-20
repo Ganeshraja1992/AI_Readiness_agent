@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Assessment {{ result.assessment_id[:8] }} — AI Readiness Agent{% endblock %}
+{% block content %}
+
+<p><a href="{{ url_for('home') }}">&larr; Back to home</a></p>
+
+<div class="card hero">
+  <div class="hero-figure">{{ result.overall_score | round | int }}</div>
+  <div class="hero-meta">
+    <div class="label">Overall readiness score &middot; use case: {{ result.use_case }} &middot; env: {{ result.environment_id }}</div>
+    <span class="badge badge-{{ result.readiness_level.value | readiness_badge }}">
+      <span class="dot"></span>{{ result.readiness_level.value }}
+    </span>
+    <div class="small-note">
+      Projected score after suggested remediation: <strong>{{ result.projected_score | round | int }}</strong>
+      &middot; assessment_id: {{ result.assessment_id }}
+      &middot; generated {{ result.generated_at.strftime('%Y-%m-%d %H:%M UTC') }}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Dimension scores</h2>
+  {% for d in result.dimension_scores %}
+  <div class="meter-row">
+    <div class="meter-name">{{ d.name | dimension_label }}</div>
+    <div class="meter-track"><div class="meter-fill" style="width: {{ d.score }}%;"></div></div>
+    <div class="meter-value">{{ d.score | round | int }}</div>
+    <div class="meter-summary">{{ d.summary }} (weight {{ (d.weight * 100) | round | int }}%)</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h2>Findings ({{ result.findings | length }})</h2>
+  {% if result.findings %}
+    {% for f in result.findings %}
+    <div class="finding">
+      <span class="badge badge-{{ f.severity | severity_badge }}"><span class="dot"></span>{{ f.severity }}</span>
+      <div class="finding-title">{{ f.title }}</div>
+      <div class="finding-impact">{{ f.impact }}</div>
+      {% if f.source %}<div class="small-note">source: {{ f.source }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty-state">No findings.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Suggested remediation</h2>
+  {% if result.remediation %}
+    {% for r in result.remediation %}
+    <div class="remediation">
+      <div class="remediation-action">{{ r.action }}</div>
+      <div class="remediation-meta">effort: {{ r.effort }} &middot; projected score gain: +{{ r.projected_score_delta }}</div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty-state">No remediation needed — all dimensions scored 85+.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Secure Result Channel</h2>
+  <p class="small-note">
+    This is the exact <code>ControlPlanePayload</code> that was signed and delivered to
+    Member 3's Control Plane (or the local outbox). It contains no raw record values or
+    sample data — only these aggregate scores, findings, and remediation actions.
+  </p>
+  <details class="raw-payload">
+    <summary>View payload JSON</summary>
+    <pre>{{ payload_json }}</pre>
+  </details>
+</div>
+
+{% endblock %}

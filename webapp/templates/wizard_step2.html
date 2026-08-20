@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Connect Data — AI Readiness Agent{% endblock %}
+{% block content %}
+
+{% include "_stepper.html" %}
+
+{% if error %}<div class="error-banner" role="alert">{{ error }}</div>{% endif %}
+
+<p class="small-note">
+  Use case: <strong>{{ use_case }}</strong> &middot; Environment: <strong>{{ environment_id }}</strong>
+  &middot; <a href="{{ url_for('wizard_step1') }}">change</a>
+</p>
+
+<div class="card">
+  <h2>2. Connect / upload data</h2>
+
+  <div class="sub-section">
+    <h3>Scan S3 bucket</h3>
+    {% if s3_connector %}
+      <p class="small-note">
+        Connected to <code>s3://{{ s3_connector.bucket }}{% if s3_connector.prefix %}/{{ s3_connector.prefix }}{% endif %}</code>{% if s3_connector.region %} ({{ s3_connector.region }}){% endif %}
+      </p>
+      <form method="post" action="{{ url_for('run_assessment') }}">
+        <input type="hidden" name="use_case" value="{{ use_case }}">
+        <input type="hidden" name="environment_id" value="{{ environment_id }}">
+        <div class="button-row">
+          <button type="submit" name="action" value="s3">Scan S3 bucket</button>
+          <button type="submit" name="action" value="security">Run security scan</button>
+        </div>
+      </form>
+      <form method="post" action="{{ url_for('delete_s3_connector') }}">
+        <input type="hidden" name="use_case" value="{{ use_case }}">
+        <input type="hidden" name="environment_id" value="{{ environment_id }}">
+        <button type="submit" class="button-secondary">Disconnect</button>
+      </form>
+      <details style="margin-top: 14px;">
+        <summary>Edit connection</summary>
+        <form method="post" action="{{ url_for('save_s3_connector') }}">
+          <input type="hidden" name="use_case" value="{{ use_case }}">
+          <input type="hidden" name="environment_id" value="{{ environment_id }}">
+          <label for="bucket">Bucket</label>
+          <input type="text" id="bucket" name="bucket" placeholder="my-bucket" value="{{ s3_connector.bucket }}" required>
+          <label for="prefix">Prefix (optional)</label>
+          <input type="text" id="prefix" name="prefix" placeholder="optional/prefix" value="{{ s3_connector.prefix }}">
+          <label for="region">Region (optional)</label>
+          <input type="text" id="region" name="region" placeholder="us-east-1" value="{{ s3_connector.region }}">
+          <button type="submit">Save connection</button>
+        </form>
+      </details>
+    {% else %}
+      <p class="small-note">Connect a bucket to scan its data or run a security check.</p>
+      <form method="post" action="{{ url_for('save_s3_connector') }}">
+        <input type="hidden" name="use_case" value="{{ use_case }}">
+        <input type="hidden" name="environment_id" value="{{ environment_id }}">
+        <label for="bucket">Bucket</label>
+        <input type="text" id="bucket" name="bucket" placeholder="my-bucket or s3://my-bucket/prefix" required>
+        <label for="prefix">Prefix (optional)</label>
+        <input type="text" id="prefix" name="prefix" placeholder="optional/prefix">
+        <label for="region">Region (optional)</label>
+        <input type="text" id="region" name="region" placeholder="us-east-1">
+        <button type="submit">Save connection</button>
+      </form>
+    {% endif %}
+    <p class="small-note">Requires AWS credentials in this environment.</p>
+  </div>
+
+  <div class="sub-section">
+    <h3>Scan RDS database</h3>
+    {% if rds_connector %}
+      <p class="small-note">
+        Connected to <code>postgresql://{{ rds_connector.host }}:{{ rds_connector.port }}/{{ rds_connector.database }}</code>{% if rds_connector.table %} (table: {{ rds_connector.table }}){% endif %}
+      </p>
+      <form method="post" action="{{ url_for('run_assessment') }}">
+        <input type="hidden" name="use_case" value="{{ use_case }}">
+        <input type="hidden" name="environment_id" value="{{ environment_id }}">
+        <div class="button-row">
+          <button type="submit" name="action" value="rds">Scan RDS database</button>
+        </div>
+      </form>
+      <form method="post" action="{{ url_for('delete_rds_connector') }}">
+        <input type="hidden" name="use_case" value="{{ use_case }}">
+        <input type="hidden" name="environment_id" value="{{ environment_id }}">
+        <button type="submit" class="button-secondary">Disconnect</button>
+      </form>
+      <details style="margin-top: 14px;">
+        <summary>Edit connection</summary>
+        <form method="post" action="{{ url_for('save_rds_connector') }}">
+          <input type="hidden" name="use_case" value="{{ use_case }}">
+          <input type="hidden" name="environment_id" value="{{ environment_id }}">
+          <label for="rds_host">Host</label>
+          <input type="text" id="rds_host" name="host" placeholder="my-db.cluster.rds.amazonaws.com" value="{{ rds_connector.host }}" required>
+          <label for="rds_port">Port</label>
+          <input type="text" id="rds_port" name="port" placeholder="5432" value="{{ rds_connector.port }}">
+          <label for="rds_database">Database</label>
+          <input type="text" id="rds_database" name="database" placeholder="app" value="{{ rds_connector.database }}">
+          <label for="rds_table">Table</label>
+          <input type="text" id="rds_table" name="table" placeholder="customers" value="{{ rds_connector.table }}">
+          <label for="rds_username">Username</label>
+          <input type="text" id="rds_username" name="username" placeholder="readonly_user" value="{{ rds_connector.username }}">
+          <label for="rds_password">Password</label>
+          <input type="password" id="rds_password" name="password" placeholder="leave blank to keep current password">
+          <button type="submit">Save connection</button>
+        </form>
+      </details>
+    {% else %}
+      <p class="small-note">Connect a Postgres/RDS database to scan a sample of rows from a table.</p>
+      <form method="post" action="{{ url_for('save_rds_connector') }}">
+        <input type="hidden" name="use_case" value="{{ use_case }}">
+        <input type="hidden" name="environment_id" value="{{ environment_id }}">
+        <label for="rds_host">Host</label>
+        <input type="text" id="rds_host" name="host" placeholder="my-db.cluster.rds.amazonaws.com" required>
+        <label for="rds_port">Port</label>
+        <input type="text" id="rds_port" name="port" placeholder="5432" value="5432">
+        <label for="rds_database">Database</label>
+        <input type="text" id="rds_database" name="database" placeholder="app">
+        <label for="rds_table">Table</label>
+        <input type="text" id="rds_table" name="table" placeholder="customers">
+        <label for="rds_username">Username</label>
+        <input type="text" id="rds_username" name="username" placeholder="readonly_user">
+        <label for="rds_password">Password</label>
+        <input type="password" id="rds_password" name="password">
+        <button type="submit">Save connection</button>
+      </form>
+    {% endif %}
+    <p class="small-note">Requires AWS credentials in this environment and network access to the database.</p>
+  </div>
+
+  <div class="sub-section">
+    <h3>Assess uploaded documents</h3>
+    <form method="post" action="{{ url_for('run_assessment') }}" enctype="multipart/form-data">
+      <input type="hidden" name="use_case" value="{{ use_case }}">
+      <input type="hidden" name="environment_id" value="{{ environment_id }}">
+
+      <label for="documents">Documents (PDF / CSV / TXT / JSON)</label>
+      <input type="file" id="documents" name="documents" multiple accept=".pdf,.csv,.txt,.json,.md,.log">
+
+      <button type="submit" name="action" value="documents">Assess uploaded documents</button>
+    </form>
+  </div>
+
+  <p class="small-note">
+    Each action ingests its own source and carries you straight into steps
+    3-7 (Analyze &rarr; Calculate &rarr; Blockers &rarr; Remediation &rarr; Projected)
+    for that data.
+  </p>
+</div>
+
+{% endblock %}
