@@ -12,6 +12,7 @@
   <div class="topbar">
     <div class="brand">AI Readiness Agent <small>local demo</small></div>
     <nav aria-label="Primary">
+      <a href="{{ url_for('home') }}">Home</a>
       {% if user %}
         <a href="{{ url_for('dashboard') }}">Dashboard</a>
         <a href="{{ url_for('logout') }}">Log out ({{ user }})</a>
