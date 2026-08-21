@@ -225,6 +225,23 @@ _LEVEL_ORDER = ["NOT_READY", "NEEDS_WORK", "READY", "AI_READY"]
 _TREND_MAX_POINTS = 15
 _SPARKLINE_W, _SPARKLINE_H, _SPARKLINE_PAD = 400, 80, 10
 
+# Dashboard stat-tile -> Past Assessments table filter. "all" (or anything
+# else unrecognized) shows every row -- there's no natural single-category
+# slice for "average score", so that tile just links to "all" too.
+_DASHBOARD_FILTERS = {
+    "ai_ready": ("AI-ready runs", lambda a: a["readiness_level"] == "AI_READY"),
+    "needs_attention": ("Needs attention", lambda a: a["readiness_level"] in ("NOT_READY", "NEEDS_WORK")),
+}
+
+
+def _filter_assessments(assessments: list[dict], filter_key: str) -> tuple[list[dict], str]:
+    """Returns (filtered rows, human label for the active filter, or "")."""
+    entry = _DASHBOARD_FILTERS.get(filter_key)
+    if not entry:
+        return assessments, ""
+    label, predicate = entry
+    return [a for a in assessments if predicate(a)], label
+
 
 def _dashboard_stats(assessments: list[dict]) -> dict:
     """Summary stats + a trend sparkline for the home page dashboard, all
@@ -287,7 +304,16 @@ def home():
 def dashboard():
     assessments = audit_store.list_audits(_config())
     stats = _dashboard_stats(assessments)
-    return render_template("dashboard.html", user=session.get("user"), assessments=assessments, stats=stats)
+    active_filter = request.args.get("filter", "")
+    filtered, filter_label = _filter_assessments(assessments, active_filter)
+    return render_template(
+        "dashboard.html",
+        user=session.get("user"),
+        assessments=filtered,
+        stats=stats,
+        active_filter=active_filter if filter_label else "",
+        filter_label=filter_label,
+    )
 
 
 # ----------------------------------------------------------------------

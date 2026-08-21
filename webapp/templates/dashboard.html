@@ -10,22 +10,22 @@
     <p class="empty-state">Run your first assessment to see stats here.</p>
   {% else %}
     <div class="stat-grid">
-      <a class="stat-tile stat-tile-link" href="#past-assessments" aria-label="Jump to the {{ stats.total }} past assessments listed below">
+      <a class="stat-tile stat-tile-link" href="{{ url_for('dashboard') }}#past-assessments" aria-label="Show all {{ stats.total }} past assessments">
         <div class="stat-figure">{{ stats.total }}</div>
         <div class="stat-label">Total assessments &darr;</div>
       </a>
-      <div class="stat-tile">
+      <a class="stat-tile stat-tile-link" href="{{ url_for('dashboard') }}#past-assessments" aria-label="Show all past assessments">
         <div class="stat-figure">{{ stats.avg_score }}</div>
-        <div class="stat-label">Average score</div>
-      </div>
-      <div class="stat-tile">
+        <div class="stat-label">Average score &darr;</div>
+      </a>
+      <a class="stat-tile stat-tile-link" href="{{ url_for('dashboard', filter='ai_ready') }}#past-assessments" aria-label="Show only the {{ stats.level_counts.AI_READY }} AI-ready assessments">
         <div class="stat-figure stat-figure-good">{{ stats.level_counts.AI_READY }}</div>
-        <div class="stat-label">AI-ready runs</div>
-      </div>
-      <div class="stat-tile">
+        <div class="stat-label">AI-ready runs &darr;</div>
+      </a>
+      <a class="stat-tile stat-tile-link" href="{{ url_for('dashboard', filter='needs_attention') }}#past-assessments" aria-label="Show only the {{ stats.needs_attention }} assessments needing attention">
         <div class="stat-figure stat-figure-critical">{{ stats.needs_attention }}</div>
-        <div class="stat-label">Needs attention</div>
-      </div>
+        <div class="stat-label">Needs attention &darr;</div>
+      </a>
     </div>
 
     <div class="dashboard-row">
@@ -77,6 +77,13 @@
 
 <div class="card" id="past-assessments">
   <h2>Past assessments</h2>
+  {% if filter_label %}
+  <p class="small-note filter-banner">
+    Showing {{ assessments | length }} assessment{{ 's' if assessments | length != 1 else '' }}
+    filtered to <strong>{{ filter_label }}</strong>.
+    <a href="{{ url_for('dashboard') }}#past-assessments">Clear filter</a>
+  </p>
+  {% endif %}
   {% if assessments %}
   <table>
     <thead>
@@ -117,6 +124,8 @@
       {% endfor %}
     </tbody>
   </table>
+  {% elif filter_label %}
+  <p class="empty-state">No assessments match <strong>{{ filter_label }}</strong>. <a href="{{ url_for('dashboard') }}#past-assessments">Clear filter</a>.</p>
   {% else %}
   <p class="empty-state">No assessments run yet &mdash; use the button above to run the first one.</p>
   {% endif %}
