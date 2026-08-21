@@ -284,12 +284,25 @@ def _ai_content_analysis(profile: DataProfile, weight: float, findings: list[Fin
         )
 
     score = max(0.0, 100.0 - penalty)
-    fit_note = ""
+    critical_count = sum(1 for f in analysis.sensitive_data_findings if f.severity == "critical")
+    engine_label = {"anthropic": "Anthropic Claude", "bedrock": "Amazon Bedrock", "openrouter": "OpenRouter"}.get(
+        analysis.engine, "LLM"
+    )
+    # State this dimension's own score explicitly, and clearly separate it
+    # from use_case_fit_score below -- otherwise readers see two different
+    # 0-100 numbers in the same sentence and reasonably assume the bar
+    # isn't reflecting whichever one is quoted in the text.
+    summary = (
+        f"{engine_label} flagged {len(analysis.sensitive_data_findings)} sensitive-content finding(s) "
+        f"({critical_count} critical) and {len(analysis.quality_issues)} quality issue(s) in sampled "
+        f"content, scoring this dimension {score:.0f}/100."
+    )
     if analysis.use_case_fit_score is not None:
-        fit_note = f" Use-case fit (LLM-assessed): {analysis.use_case_fit_score:.0f}/100 — {analysis.use_case_fit_notes}"
-    total_issues = len(analysis.sensitive_data_findings) + len(analysis.quality_issues)
-    engine_label = {"anthropic": "Anthropic Claude", "bedrock": "Amazon Bedrock"}.get(analysis.engine, "LLM")
-    summary = f"{engine_label} reviewed sampled content and flagged {total_issues} potential issue(s).{fit_note}"
+        summary += (
+            f" Separately (not part of this dimension's score), the LLM also judged how well this "
+            f"sampled data fits the stated use case: {analysis.use_case_fit_score:.0f}/100 — "
+            f"{analysis.use_case_fit_notes}"
+        )
     return DimensionScore(
         name="ai_content_analysis",
         score=round(score, 1),
