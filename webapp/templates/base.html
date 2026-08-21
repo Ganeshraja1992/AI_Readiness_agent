@@ -4,6 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}AI Readiness Agent{% endblock %}</title>
+  <script>
+    // Runs synchronously before first paint so the page never flashes the
+    // wrong theme: an explicit choice (localStorage) wins, otherwise fall
+    // back to the OS/browser preference -- see style.css's
+    // :root[data-theme="dark"] override and the plain @media fallback.
+    (function () {
+      var stored = null;
+      try { stored = localStorage.getItem("theme"); } catch (e) { /* storage blocked; fall through */ }
+      var theme = stored === "light" || stored === "dark"
+        ? stored
+        : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -17,6 +31,22 @@
         <a href="{{ url_for('dashboard') }}">Dashboard</a>
         <a href="{{ url_for('logout') }}">Log out ({{ user }})</a>
       {% endif %}
+      <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Switch between light and dark theme" aria-pressed="false">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"></circle>
+          <line x1="12" y1="2" x2="12" y2="4"></line>
+          <line x1="12" y1="20" x2="12" y2="22"></line>
+          <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"></line>
+          <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"></line>
+          <line x1="2" y1="12" x2="4" y2="12"></line>
+          <line x1="20" y1="12" x2="22" y2="12"></line>
+          <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"></line>
+          <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"></line>
+        </svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
     </nav>
   </div>
   <main class="container" id="main-content">
@@ -35,6 +65,22 @@
   </div>
 
   <script>
+    (function () {
+      var toggle = document.getElementById("theme-toggle");
+      if (toggle) {
+        var syncPressed = function () {
+          toggle.setAttribute("aria-pressed", document.documentElement.getAttribute("data-theme") === "dark");
+        };
+        syncPressed();
+        toggle.addEventListener("click", function () {
+          var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+          document.documentElement.setAttribute("data-theme", next);
+          try { localStorage.setItem("theme", next); } catch (e) { /* storage blocked; theme still applies this session */ }
+          syncPressed();
+        });
+      }
+    })();
+
     (function () {
       var overlay = document.getElementById("loading-overlay");
 

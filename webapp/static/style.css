@@ -98,6 +98,44 @@
   }
 }
 
+/* Explicit override for the theme-toggle button below, independent of OS
+   preference -- [data-theme="dark"]'s specificity (0,0,1,1) beats the
+   :where()-guarded media-query rule above (0,0,1,0) either way, so this
+   wins whenever set regardless of source order. Same values as the media
+   query block; kept in sync manually since CSS has no mixins. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --surface-2: #232322;
+  --page-plane: #0d0d0d;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #a7a6a2;
+  --link-color: #87a9d3;
+  --gridline: #2c2c2a;
+  --border: rgba(255, 255, 255, 0.10);
+  --seq-100: #b7d3f6;
+  --seq-400: #3987e5;
+  --seq-500: #1c5cab;
+  --seq-700: #104281;
+  --status-good: #0ca30c;
+  --status-good-text: #4ebc4e;
+  --status-warning: #fab219;
+  --status-warning-text: #fab219;
+  --status-serious: #ec835a;
+  --status-serious-text: #ee8d67;
+  --status-critical: #d03b3b;
+  --status-critical-text: #e48d8d;
+  --accent-violet: #a78bfa;
+  --accent-violet-text: #b097fa;
+  --accent-cyan: #22d3ee;
+  --accent-pink: #f472b6;
+  --btn-glow: color-mix(in srgb, var(--accent-violet) 55%, transparent);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
 /* Respect "reduce motion" (WCAG 2.3.3, AAA) — collapses every animation/
    transition in this file to effectively instant. Functional feedback
    (spinners, the loading overlay) still appears, just without motion. */
@@ -199,6 +237,39 @@ a:hover { text-decoration: underline; }
 }
 .topbar nav a:hover { color: var(--accent-violet-text); }
 
+/* --- Theme toggle --- */
+.theme-toggle {
+  width: 34px;
+  height: 34px;
+  margin-left: var(--space-5);
+  padding: 0;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.theme-toggle:hover {
+  border-color: var(--accent-violet);
+  color: var(--accent-violet-text);
+  transform: translateY(-1px) rotate(-8deg);
+  box-shadow: 0 4px 12px var(--btn-glow);
+}
+.theme-toggle svg { width: 17px; height: 17px; }
+.theme-toggle .icon-sun { display: none; }
+.theme-toggle .icon-moon { display: block; }
+:root[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+:root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])):not([data-theme="dark"]) .theme-toggle .icon-sun { display: block; }
+  :root:where(:not([data-theme="light"])):not([data-theme="dark"]) .theme-toggle .icon-moon { display: none; }
+}
+
 .container {
   max-width: 960px;
   margin: 0 auto;
@@ -237,6 +308,12 @@ a:hover { text-decoration: underline; }
 }
 
 /* --- Login page --- */
+.login-shell-toggle {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-5);
+  z-index: 5;
+}
 .login-shell {
   min-height: 100vh;
   display: flex;
