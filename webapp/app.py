@@ -382,7 +382,7 @@ def _apply_rds_connector(config, connector: connectors.RDSConnector) -> None:
     since a real database was configured."""
     config.rds.engine = connector["engine"]
     config.rds.host = connector["host"]
-    config.rds.port = int(connector["port"] or (3306 if connector["engine"] == "mysql" else 5432))
+    config.rds.port = int(connector["port"])
     config.rds.database = connector["database"]
     config.rds.table = connector["table"]
     config.rds.username = connector["username"]

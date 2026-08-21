@@ -36,7 +36,8 @@ class S3Config:
 
 @dataclass
 class RDSConfig:
-    # "postgresql" or "mysql" -- picks the SQLAlchemy dialect/driver in
+    # "postgresql", "mysql", "mariadb", "oracle", or "mssql" -- every engine
+    # Amazon RDS offers. Picks the SQLAlchemy dialect/driver in
     # rds_adapter.py. Pointing the wrong dialect at a real server causes the
     # connection to hang on a protocol mismatch rather than fail fast.
     engine: str = os.environ.get("READINESS_RDS_ENGINE", "postgresql")

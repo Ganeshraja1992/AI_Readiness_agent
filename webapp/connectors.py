@@ -85,8 +85,18 @@ def delete_s3_connector() -> None:
 
 
 # ----------------------------------------------------------------------
-# RDS connector
+# RDS connector -- covers every engine Amazon RDS actually offers.
 # ----------------------------------------------------------------------
+RDS_ENGINES = ("postgresql", "mysql", "mariadb", "oracle", "mssql")
+_DEFAULT_PORTS = {
+    "postgresql": "5432",
+    "mysql": "3306",
+    "mariadb": "3306",
+    "oracle": "1521",
+    "mssql": "1433",
+}
+
+
 class RDSConnector(TypedDict):
     engine: str
     host: str
@@ -105,10 +115,12 @@ def load_rds_connector() -> Optional[RDSConnector]:
     if not host:
         return None
     engine = data.get("engine") or "postgresql"
+    if engine not in RDS_ENGINES:
+        engine = "postgresql"
     return {
         "engine": engine,
         "host": host,
-        "port": data.get("port") or ("3306" if engine == "mysql" else "5432"),
+        "port": data.get("port") or _DEFAULT_PORTS[engine],
         "database": data.get("database", ""),
         "table": data.get("table", ""),
         "username": data.get("username", ""),
@@ -119,13 +131,13 @@ def load_rds_connector() -> Optional[RDSConnector]:
 def save_rds_connector(
     engine: str, host: str, port: str, database: str, table: str, username: str, password: str
 ) -> None:
-    engine = engine if engine in ("postgresql", "mysql") else "postgresql"
+    engine = engine if engine in RDS_ENGINES else "postgresql"
     _save_param(
         RDS_PARAM,
         {
             "engine": engine,
             "host": host.strip(),
-            "port": port.strip() or ("3306" if engine == "mysql" else "5432"),
+            "port": port.strip() or _DEFAULT_PORTS[engine],
             "database": database.strip(),
             "table": table.strip(),
             "username": username.strip(),

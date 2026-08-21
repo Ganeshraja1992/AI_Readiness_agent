@@ -1,9 +1,10 @@
 """
 RDS ingestion adapter.
 
-Real mode: connects via SQLAlchemy (works against Postgres/MySQL RDS
-instances given a proper connection string built from RDSConfig) and pulls a
-sample of rows from the configured table.
+Real mode: connects via SQLAlchemy and pulls a sample of rows from the
+configured table. Covers every engine Amazon RDS actually offers:
+PostgreSQL, MySQL, MariaDB, Oracle, and SQL Server -- given a proper
+connection string built from RDSConfig.
 
 Mock mode (default): reads mock_data/rds_customers.csv so the pipeline runs
 with no database at all.
@@ -27,7 +28,29 @@ DEFAULT_SAMPLE_LIMIT = 5000
 _DIALECT_DRIVERS = {
     "postgresql": "postgresql+psycopg2",
     "mysql": "mysql+pymysql",
+    "mariadb": "mysql+pymysql",  # MariaDB speaks the MySQL wire protocol
+    "oracle": "oracle+oracledb",
+    "mssql": "mssql+pymssql",
 }
+
+# Each DBAPI names its connection-establishment timeout differently.
+_CONNECT_TIMEOUT_KWARG = {
+    "postgresql": "connect_timeout",
+    "mysql": "connect_timeout",
+    "mariadb": "connect_timeout",
+    "oracle": "tcp_connect_timeout",
+    "mssql": "login_timeout",
+}
+
+
+def _select_sql(engine: str, table: str) -> str:
+    """"Give me at most N rows" is spelled differently per dialect --
+    LIMIT isn't SQL-standard and neither Oracle nor SQL Server support it."""
+    if engine == "oracle":
+        return f"SELECT * FROM {table} FETCH FIRST :limit ROWS ONLY"
+    if engine == "mssql":
+        return f"SELECT TOP (:limit) * FROM {table}"
+    return f"SELECT * FROM {table} LIMIT :limit"
 
 
 class RDSAdapter(DataSourceAdapter):
@@ -77,26 +100,39 @@ class RDSAdapter(DataSourceAdapter):
                 f"unknown RDS engine {self.config.engine!r}; expected one of {sorted(_DIALECT_DRIVERS)}"
             )
             return batch
-        url = (
-            f"{dialect}://{self.config.username}:{self.config.password}"
-            f"@{self.config.host}:{self.config.port}/{self.config.database}"
-        )
+        if self.config.engine == "oracle":
+            # Oracle distinguishes SIDs from service names; putting the
+            # database in the URL path gets parsed as a SID (and RDS/PDB
+            # databases are service names, not SIDs) -- "DPY-6003: SID ...
+            # is not registered with the listener" even though the service
+            # exists. service_name as a query param is what actually works.
+            url = (
+                f"{dialect}://{self.config.username}:{self.config.password}"
+                f"@{self.config.host}:{self.config.port}/?service_name={self.config.database}"
+            )
+        else:
+            url = (
+                f"{dialect}://{self.config.username}:{self.config.password}"
+                f"@{self.config.host}:{self.config.port}/{self.config.database}"
+            )
         try:
             # A misconfigured security group / wrong host+port hangs the TCP
             # handshake rather than failing fast -- cap it well under
             # gunicorn's worker timeout so the request comes back with a
             # real error instead of an empty/dropped connection.
-            engine = create_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 10})
+            timeout_kwarg = _CONNECT_TIMEOUT_KWARG[self.config.engine]
+            engine = create_engine(url, pool_pre_ping=True, connect_args={timeout_kwarg: 10})
             with engine.connect() as conn:
                 result = conn.execute(
-                    text(f"SELECT * FROM {self.config.table} LIMIT :limit"),
+                    text(_select_sql(self.config.engine, self.config.table)),
                     {"limit": self.sample_limit},
                 )
                 columns = result.keys()
                 now = datetime.now(timezone.utc)
                 for row in result:
                     fields = dict(zip(columns, row))
-                    pk = fields.get("id", "")
+                    # Oracle folds unquoted column names to uppercase.
+                    pk = fields.get("id") or fields.get("ID") or ""
                     batch.records.append(
                         SourceRecord(
                             fields=fields,

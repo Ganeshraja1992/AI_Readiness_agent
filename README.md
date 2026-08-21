@@ -260,7 +260,7 @@ and setting credentials/connection info — no code changes:
 | Adapter | Real mode | Mock mode |
 |---|---|---|
 | `S3Adapter` | `boto3` list + get objects (`.json`/`.jsonl`/`.csv`) under `bucket/prefix` | reads `mock_data/s3/*` |
-| `RDSAdapter` | `SQLAlchemy` `SELECT * FROM <table> LIMIT n` | reads `mock_data/rds_customers.csv` |
+| `RDSAdapter` | `SQLAlchemy` against PostgreSQL, MySQL, MariaDB, Oracle, or SQL Server (every engine Amazon RDS offers) | reads `mock_data/rds_customers.csv` |
 | `DocumentsAdapter` | scans a local/EFS/mounted folder | same code path — point it at `mock_data/documents` |
 
 One S3 bucket is split into **one batch per object**, not one batch for
@@ -385,6 +385,7 @@ real credentials with no code changes:
 |---|---|
 | `READINESS_USE_MOCK_AWS` | `true` (default) reads `mock_data/`; `false` uses real S3/RDS |
 | `READINESS_S3_BUCKET`, `READINESS_S3_PREFIX`, `AWS_REGION` | S3 source config |
+| `READINESS_RDS_ENGINE` | `postgresql` (default), `mysql`, `mariadb`, `oracle`, or `mssql` |
 | `READINESS_RDS_HOST/PORT/DATABASE/TABLE/USER/PASSWORD` | RDS source config |
 | `READINESS_DOCUMENTS_DIR` | folder to scan for documents |
 | `READINESS_ENVIRONMENT_ID`, `READINESS_USE_CASE` | defaults for standalone runs |

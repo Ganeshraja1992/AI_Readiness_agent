@@ -91,6 +91,9 @@
           <select id="rds_engine_edit" name="engine" class="rds-engine-select">
             <option value="postgresql" {% if rds_connector.engine == "postgresql" %}selected{% endif %}>PostgreSQL</option>
             <option value="mysql" {% if rds_connector.engine == "mysql" %}selected{% endif %}>MySQL</option>
+            <option value="mariadb" {% if rds_connector.engine == "mariadb" %}selected{% endif %}>MariaDB</option>
+            <option value="oracle" {% if rds_connector.engine == "oracle" %}selected{% endif %}>Oracle</option>
+            <option value="mssql" {% if rds_connector.engine == "mssql" %}selected{% endif %}>SQL Server</option>
           </select>
           <label for="rds_host_edit">Host</label>
           <input type="text" id="rds_host_edit" name="host" placeholder="my-db.cluster.rds.amazonaws.com" value="{{ rds_connector.host }}" required>
@@ -108,7 +111,7 @@
         </form>
       </details>
     {% else %}
-      <p class="small-note">Connect a PostgreSQL or MySQL database to scan a sample of rows from a table.</p>
+      <p class="small-note">Connect a PostgreSQL, MySQL, MariaDB, Oracle, or SQL Server database to scan a sample of rows from a table.</p>
       <form method="post" action="{{ url_for('save_rds_connector') }}" class="rds-connector-form">
         <input type="hidden" name="use_case" value="{{ use_case }}">
         <input type="hidden" name="environment_id" value="{{ environment_id }}">
@@ -116,6 +119,9 @@
         <select id="rds_engine" name="engine" class="rds-engine-select">
           <option value="postgresql" selected>PostgreSQL</option>
           <option value="mysql">MySQL</option>
+          <option value="mariadb">MariaDB</option>
+          <option value="oracle">Oracle</option>
+          <option value="mssql">SQL Server</option>
         </select>
         <label for="rds_host">Host</label>
         <input type="text" id="rds_host" name="host" placeholder="my-db.cluster.rds.amazonaws.com" required>
@@ -132,7 +138,7 @@
         <button type="submit">Save connection</button>
       </form>
     {% endif %}
-    <p class="small-note">Requires network access from this app to the database (matching security group/port) and, for MySQL, port 3306 open instead of 5432.</p>
+    <p class="small-note">Requires network access from this app to the database, on that engine's port (PostgreSQL 5432, MySQL/MariaDB 3306, Oracle 1521, SQL Server 1433 by default).</p>
   </div>
 
   <div class="sub-section">
@@ -159,7 +165,7 @@
   // Auto-suggest the standard port for the selected engine, without
   // clobbering a port the user already typed in by hand.
   (function () {
-    var defaults = { postgresql: "5432", mysql: "3306" };
+    var defaults = { postgresql: "5432", mysql: "3306", mariadb: "3306", oracle: "1521", mssql: "1433" };
     document.querySelectorAll(".rds-connector-form").forEach(function (form) {
       var select = form.querySelector(".rds-engine-select");
       var port = form.querySelector(".rds-port-input");
