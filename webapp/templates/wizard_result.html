@@ -43,7 +43,12 @@
   <h2>4. Calculate AI Readiness</h2>
   {% for d in result.dimension_scores %}
   <div class="meter-row">
-    <div class="meter-name">{{ d.name | dimension_label }}</div>
+    <div class="meter-name">
+      {{ d.name | dimension_label }}
+      <span class="badge badge-{{ d.score | severity_tier | severity_tier_badge }} tier-badge">
+        <span class="dot"></span>{{ d.score | severity_tier }}
+      </span>
+    </div>
     <div class="meter-track"><div class="meter-fill" style="width: {{ d.score }}%;"></div></div>
     <div class="meter-value">{{ d.score | round | int }}</div>
     <div class="meter-summary">{{ d.summary }} (weight {{ (d.weight * 100) | round | int }}%)</div>

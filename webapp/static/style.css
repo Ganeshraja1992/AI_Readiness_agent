@@ -696,7 +696,17 @@ details summary:hover { text-decoration: underline; }
 }
 .meter-row:last-child { border-bottom: none; }
 
-.meter-name { font-size: var(--text-sm); color: var(--text-secondary); font-weight: 600; }
+.meter-name {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.tier-badge { padding: 1px 8px; font-size: 9px; }
+.tier-badge .dot { width: 6px; height: 6px; }
 
 .meter-track {
   height: 9px;

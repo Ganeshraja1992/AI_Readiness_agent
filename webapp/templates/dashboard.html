@@ -43,6 +43,13 @@
           <span><i class="dist-dot dist-ready"></i>Ready ({{ stats.level_counts.READY }})</span>
           <span><i class="dist-dot dist-ai-ready"></i>AI-ready ({{ stats.level_counts.AI_READY }})</span>
         </div>
+        <p class="small-note">
+          Of {{ stats.total }} assessment{{ 's' if stats.total != 1 else '' }}:
+          <strong>{{ stats.level_pct.NOT_READY }}%</strong> Warning &middot;
+          <strong>{{ stats.level_pct.NEEDS_WORK }}%</strong> High &middot;
+          <strong>{{ stats.level_pct.READY }}%</strong> Medium &middot;
+          <strong>{{ stats.level_pct.AI_READY }}%</strong> Low concern.
+        </p>
       </div>
 
       {% if stats.trend_last %}

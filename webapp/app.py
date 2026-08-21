@@ -101,6 +101,28 @@ _SEVERITY_BADGE = {
     "critical": "critical",
 }
 
+# Four-tier concern labels applied to any 0-100 score (a single dimension's
+# score, or an assessment's overall_score) -- ascending concern, Warning
+# being the most severe. Deliberately the same 85/70/50 boundaries the
+# engine already uses for NOT_READY/NEEDS_WORK/READY/AI_READY (rules.py's
+# READINESS_LEVEL_THRESHOLDS), just relabeled for this more general use.
+_SEVERITY_TIER_THRESHOLDS = ((85, "Low"), (70, "Medium"), (50, "High"))
+_SEVERITY_TIER_DEFAULT = "Warning"
+_SEVERITY_TIER_BADGE = {"Low": "good", "Medium": "warning", "High": "serious", "Warning": "critical"}
+_LEVEL_TO_TIER = {
+    "AI_READY": "Low",
+    "READY": "Medium",
+    "NEEDS_WORK": "High",
+    "NOT_READY": "Warning",
+}
+
+
+def _severity_tier(score: float) -> str:
+    for floor, label in _SEVERITY_TIER_THRESHOLDS:
+        if score >= floor:
+            return label
+    return _SEVERITY_TIER_DEFAULT
+
 # The 7-stage product flow this wizard walks through. "usecase" and
 # "connect" are their own pages (steps 1-2); "analyze".."projected" are all
 # rendered from the single already-computed AssessmentResult (steps 3-7) —
@@ -137,6 +159,21 @@ def severity_badge(severity: str) -> str:
 @app.template_filter("dimension_label")
 def dimension_label(name: str) -> str:
     return name.replace("_", " ").title().replace("Ai ", "AI ")
+
+
+@app.template_filter("severity_tier")
+def severity_tier_filter(score: float) -> str:
+    return _severity_tier(score)
+
+
+@app.template_filter("severity_tier_badge")
+def severity_tier_badge_filter(tier: str) -> str:
+    return _SEVERITY_TIER_BADGE.get(tier, "info")
+
+
+@app.template_filter("level_tier")
+def level_tier_filter(level: str) -> str:
+    return _LEVEL_TO_TIER.get(level, "Warning")
 
 
 def _use_case_choices() -> list[str]:
