@@ -122,15 +122,12 @@ body {
   color: var(--text-primary);
   background-color: var(--page-plane);
   background-image:
-    linear-gradient(
-      color-mix(in srgb, var(--page-plane) 35%, transparent),
-      color-mix(in srgb, var(--page-plane) 35%, transparent)
-    ),
-    url("hero-bg.jpg");
-  background-repeat: no-repeat, no-repeat;
-  background-attachment: fixed, fixed;
-  background-position: center, center;
-  background-size: cover, cover;
+    radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--accent-violet) 16%, transparent) 0%, transparent 40%),
+    radial-gradient(circle at 88% 82%, color-mix(in srgb, var(--accent-cyan) 14%, transparent) 0%, transparent 45%),
+    url("ai-bg.svg");
+  background-repeat: no-repeat, no-repeat, repeat;
+  background-attachment: fixed, fixed, fixed;
+  background-size: auto, auto, 320px 320px;
   min-height: 100vh;
 }
 
