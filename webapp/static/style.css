@@ -538,6 +538,8 @@ details summary:hover { text-decoration: underline; }
   display: block;
   text-decoration: none;
   color: inherit;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 .stat-tile-link:hover {

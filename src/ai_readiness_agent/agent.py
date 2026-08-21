@@ -32,6 +32,7 @@ from ai_readiness_agent.ingestion.documents_adapter import DocumentsAdapter
 from ai_readiness_agent.ingestion.rds_adapter import RDSAdapter
 from ai_readiness_agent.ingestion.s3_adapter import S3Adapter
 from ai_readiness_agent.profiling import bedrock_analyzer, llm_analyzer
+from ai_readiness_agent.profiling.models import LLMContentAnalysis
 from ai_readiness_agent.profiling.profiler import build_data_profile
 
 logger = logging.getLogger(__name__)
@@ -120,14 +121,17 @@ class AIReadinessAgent:
                 "Anthropic content analysis unavailable (%s); falling back to Amazon Bedrock.",
                 anthropic_error,
             )
-            data_profile.llm_analysis = bedrock_analyzer.analyze(data_profile, resolved_use_case, self.config.bedrock)
+            bedrock_result = bedrock_analyzer.analyze(data_profile, resolved_use_case, self.config.bedrock)
             # Surface both attempts' errors -- otherwise a Bedrock failure
             # silently hides whatever happened with the Anthropic attempt,
             # making it impossible to tell from the result alone whether a
             # fixed Anthropic key actually worked.
-            if not data_profile.llm_analysis.performed and anthropic_error:
-                bedrock_error = data_profile.llm_analysis.error
-                data_profile.llm_analysis.error = f"anthropic: {anthropic_error} | bedrock: {bedrock_error}"
+            if not bedrock_result.performed and anthropic_error:
+                bedrock_result = LLMContentAnalysis(
+                    performed=False,
+                    error=f"anthropic: {anthropic_error} | bedrock: {bedrock_result.error}",
+                )
+            data_profile.llm_analysis = bedrock_result
         if data_profile.llm_analysis.performed:
             logger.info(
                 "LLM content analysis (%s): %d sensitive finding(s), %d quality issue(s).",
