@@ -534,6 +534,19 @@ details summary:hover { text-decoration: underline; }
   border-radius: var(--radius-sm);
   padding: var(--space-4);
 }
+.stat-tile-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.stat-tile-link:hover {
+  text-decoration: none;
+  border-color: var(--accent-violet);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+.stat-tile-link .stat-label { color: var(--link-color); }
 .stat-figure {
   font-size: var(--text-xl);
   font-weight: 800;

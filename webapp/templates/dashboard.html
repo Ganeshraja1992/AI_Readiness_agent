@@ -10,10 +10,10 @@
     <p class="empty-state">Run your first assessment to see stats here.</p>
   {% else %}
     <div class="stat-grid">
-      <div class="stat-tile">
+      <a class="stat-tile stat-tile-link" href="#past-assessments" aria-label="Jump to the {{ stats.total }} past assessments listed below">
         <div class="stat-figure">{{ stats.total }}</div>
-        <div class="stat-label">Total assessments</div>
-      </div>
+        <div class="stat-label">Total assessments &darr;</div>
+      </a>
       <div class="stat-tile">
         <div class="stat-figure">{{ stats.avg_score }}</div>
         <div class="stat-label">Average score</div>
@@ -75,7 +75,7 @@
   <a class="button-link" href="{{ url_for('wizard_step1') }}">Start new assessment &rarr;</a>
 </div>
 
-<div class="card">
+<div class="card" id="past-assessments">
   <h2>Past assessments</h2>
   {% if assessments %}
   <table>
