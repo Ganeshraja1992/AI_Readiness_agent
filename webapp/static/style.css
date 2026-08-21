@@ -772,6 +772,19 @@ tbody tr:nth-child(even) { background: color-mix(in srgb, var(--page-plane) 55%,
 tbody tr:hover { background: color-mix(in srgb, var(--accent-violet) 7%, transparent); }
 tr:last-child td { border-bottom: none; }
 
+.table-actions { white-space: nowrap; font-size: var(--text-xs); }
+.inline-form { display: inline; }
+.link-button {
+  all: unset;
+  cursor: pointer;
+  color: var(--link-color);
+  font-weight: 600;
+  font-size: inherit;
+}
+.link-button:hover { text-decoration: underline; }
+.link-button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
+.link-button-danger { color: var(--status-critical-text); }
+
 .empty-state {
   color: var(--text-muted);
   font-size: var(--text-sm);

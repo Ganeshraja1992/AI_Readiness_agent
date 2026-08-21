@@ -87,6 +87,7 @@
         <th scope="col">Score</th>
         <th scope="col">Status</th>
         <th scope="col">Run at</th>
+        <th scope="col">Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -102,6 +103,16 @@
           </span>
         </td>
         <td>{{ a.generated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td class="table-actions">
+          <a href="{{ url_for('export_assessment_pdf', assessment_id=a.assessment_id) }}" aria-label="Download PDF for assessment {{ a.assessment_id }}">PDF</a>
+          &middot;
+          <a href="{{ url_for('export_assessment_csv', assessment_id=a.assessment_id) }}" aria-label="Download CSV for assessment {{ a.assessment_id }}">CSV</a>
+          &middot;
+          <form method="post" action="{{ url_for('delete_assessment', assessment_id=a.assessment_id) }}" class="inline-form"
+                onsubmit="return confirm('Delete this assessment permanently? This cannot be undone.');">
+            <button type="submit" class="link-button link-button-danger" aria-label="Delete assessment {{ a.assessment_id }}">Delete</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

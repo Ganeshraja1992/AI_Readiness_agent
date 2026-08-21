@@ -42,6 +42,13 @@ def list_audits(config: AgentConfig, limit: int = 100) -> list[dict]:
     return _list_local(config, limit)
 
 
+def delete_audit(config: AgentConfig, assessment_id: str) -> None:
+    if config.audit_backend == "dynamodb":
+        _delete_dynamodb(config, assessment_id)
+    else:
+        _delete_local(config, assessment_id)
+
+
 # ----------------------------------------------------------------------
 # Local backend
 # ----------------------------------------------------------------------
@@ -58,6 +65,11 @@ def _read_local(config: AgentConfig, assessment_id: str) -> AssessmentResult | N
     if not path.exists():
         return None
     return AssessmentResult.model_validate_json(path.read_text())
+
+
+def _delete_local(config: AgentConfig, assessment_id: str) -> None:
+    path: Path = config.local_audit_dir / f"{assessment_id}.json"
+    path.unlink(missing_ok=True)
 
 
 def _list_local(config: AgentConfig, limit: int) -> list[dict]:
@@ -106,6 +118,11 @@ def _read_dynamodb(config: AgentConfig, assessment_id: str) -> AssessmentResult 
     if not item:
         return None
     return AssessmentResult.model_validate_json(item["result_json"])
+
+
+def _delete_dynamodb(config: AgentConfig, assessment_id: str) -> None:
+    table = _table(config)
+    table.delete_item(Key={"assessment_id": assessment_id})
 
 
 def _list_dynamodb(config: AgentConfig, limit: int) -> list[dict]:

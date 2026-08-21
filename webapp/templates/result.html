@@ -2,7 +2,13 @@
 {% block title %}Assessment {{ result.assessment_id[:8] }} — AI Readiness Agent{% endblock %}
 {% block content %}
 
-<p><a href="{{ url_for('dashboard') }}">&larr; Back to dashboard</a></p>
+<p>
+  <a href="{{ url_for('dashboard') }}">&larr; Back to dashboard</a>
+  &middot;
+  <a href="{{ url_for('export_assessment_pdf', assessment_id=result.assessment_id) }}">Download PDF</a>
+  &middot;
+  <a href="{{ url_for('export_assessment_csv', assessment_id=result.assessment_id) }}">Download CSV</a>
+</p>
 
 <div class="card hero">
   <div class="hero-figure">{{ result.overall_score | round | int }}</div>

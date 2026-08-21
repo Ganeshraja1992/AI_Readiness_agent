@@ -44,7 +44,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(ROOT / "src"))
 
-from flask import Flask, redirect, render_template, request, session, url_for  # noqa: E402
+from flask import Flask, Response, redirect, render_template, request, session, url_for  # noqa: E402
 from werkzeug.utils import secure_filename  # noqa: E402
 
 import connectors  # noqa: E402
@@ -52,6 +52,8 @@ from ai_readiness_agent import audit_store  # noqa: E402
 from ai_readiness_agent.agent import AIReadinessAgent  # noqa: E402
 from ai_readiness_agent.config import load_config  # noqa: E402
 from ai_readiness_agent.engine import rules  # noqa: E402
+from ai_readiness_agent.export.csv_report import generate_csv_report  # noqa: E402
+from ai_readiness_agent.export.pdf_report import generate_pdf_report  # noqa: E402
 
 def _resolve_secret_key() -> str:
     """WEBAPP_SECRET_KEY wins if set. Otherwise, persist a generated key to
@@ -580,6 +582,41 @@ def view_assessment(assessment_id: str):
         result=result,
         payload_json=payload.to_json(),
     )
+
+
+@app.route("/assessment/<assessment_id>/export.pdf")
+@login_required
+def export_assessment_pdf(assessment_id: str):
+    result = _load_assessment(assessment_id)
+    if not result:
+        return redirect(url_for("dashboard"))
+    pdf_bytes = generate_pdf_report(result)
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="assessment-{assessment_id[:8]}.pdf"'},
+    )
+
+
+@app.route("/assessment/<assessment_id>/export.csv")
+@login_required
+def export_assessment_csv(assessment_id: str):
+    result = _load_assessment(assessment_id)
+    if not result:
+        return redirect(url_for("dashboard"))
+    csv_text = generate_csv_report(result)
+    return Response(
+        csv_text,
+        mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="assessment-{assessment_id[:8]}.csv"'},
+    )
+
+
+@app.route("/assessment/<assessment_id>/delete", methods=["POST"])
+@login_required
+def delete_assessment(assessment_id: str):
+    audit_store.delete_audit(_config(), assessment_id)
+    return redirect(url_for("dashboard"))
 
 
 if __name__ == "__main__":
