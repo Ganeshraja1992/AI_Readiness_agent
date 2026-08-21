@@ -1,0 +1,91 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest -q
+
+  deploy:
+    name: Deploy to EC2
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    env:
+      INSTANCE_ID: i-02dd6db7607e51d84
+      APP_DIR: /opt/ai-readiness-agent
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # One-time setup on the instance (see README's "GitHub Actions
+      # deploy" section): create /opt/ai-readiness-agent/.env.docker with
+      # WEBAPP_SECRET_KEY / WEBAPP_USERNAME / WEBAPP_PASSWORD / AWS_REGION /
+      # ANTHROPIC_API_KEY. This script never touches that file, and never
+      # passes secrets through SSM, so nothing sensitive ends up in the SSM
+      # command history.
+      - name: Deploy via AWS SSM Send-Command
+        run: |
+          set -e
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy AI Readiness Agent (${{ github.sha }})" \
+            --parameters commands='[
+              "set -e",
+              "if [ -d '"$APP_DIR"'/.git ]; then cd '"$APP_DIR"' && git fetch origin main && git reset --hard origin/main; else git clone https://github.com/Ganeshraja1992/AI_Readiness_agent.git '"$APP_DIR"' && cd '"$APP_DIR"'; fi",
+              "test -f '"$APP_DIR"'/.env.docker || { echo \"Missing '"$APP_DIR"'/.env.docker -- see README GitHub Actions deploy section\"; exit 1; }",
+              "docker build -t ai-readiness-agent '"$APP_DIR"'",
+              "docker stop ai-readiness-agent 2>/dev/null || true",
+              "docker rm ai-readiness-agent 2>/dev/null || true",
+              "docker run -d --name ai-readiness-agent --restart unless-stopped -p 5000:5000 --env-file '"$APP_DIR"'/.env.docker ai-readiness-agent"
+            ]' \
+            --query "Command.CommandId" --output text)
+
+          echo "SSM command: $COMMAND_ID"
+
+          # Poll instead of `aws ssm wait command-executed` -- that waiter
+          # treats a failed command as a wait *error*, which would hide the
+          # actual stdout/stderr we want to print below.
+          for i in $(seq 1 30); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+              --query "Status" --output text 2>/dev/null || echo "Pending")
+            if [ "$STATUS" != "Pending" ] && [ "$STATUS" != "InProgress" ]; then
+              break
+            fi
+            sleep 5
+          done
+
+          echo "=== stdout ==="
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+            --query "StandardOutputContent" --output text
+          echo "=== stderr ==="
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+            --query "StandardErrorContent" --output text
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "Deploy failed with status: $STATUS"
+            exit 1
+          fi

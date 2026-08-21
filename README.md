@@ -147,6 +147,61 @@ container's writable layer, so it won't survive `docker run` recreating
 the container (only `docker start`/`stop` of the *same* container keeps
 it).
 
+## GitHub Actions: CI + auto-deploy to EC2
+
+`.github/workflows/ci-cd.yml` runs `pytest` on every push/PR, and on a
+successful push to `main` redeploys to EC2 instance `i-02dd6db7607e51d84`
+over **AWS SSM Send-Command** — no SSH key, no open port 22 needed. The
+instance pulls the latest code, rebuilds the image, and restarts the
+container.
+
+**One-time setup, before the first pipeline-driven deploy:**
+
+1. **Give the instance SSM management + app permissions.** Attach the
+   AWS-managed `AmazonSSMManagedInstanceCore` policy to the instance's IAM
+   role (needed for it to receive SSM commands at all), alongside the
+   S3/DynamoDB/SSM-parameter/Comprehend policy from the EC2 deployment
+   guide above.
+
+2. **Create an IAM user for GitHub Actions** with this policy (least
+   privilege: only `ssm:SendCommand` on this one instance + the
+   `AWS-RunShellScript` document, plus read-only status checks):
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": "ssm:SendCommand",
+         "Resource": [
+           "arn:aws:ec2:us-east-1:853973692277:instance/i-02dd6db7607e51d84",
+           "arn:aws:ssm:us-east-1::document/AWS-RunShellScript"
+         ]
+       },
+       {
+         "Effect": "Allow",
+         "Action": ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"],
+         "Resource": "*"
+       }
+     ]
+   }
+   ```
+   Create an access key for that user, then add two **repository secrets**
+   in GitHub (Settings → Secrets and variables → Actions):
+   `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+
+3. **Place a real `.env.docker` on the instance once**, at
+   `/opt/ai-readiness-agent/.env.docker` (same format as
+   `.env.docker.example`). The pipeline deliberately never creates or
+   overwrites this file — secrets never pass through the SSM command
+   itself, only a pre-existing file on disk does. If `/opt` needs `sudo`
+   to create, run `sudo mkdir -p /opt/ai-readiness-agent && sudo chown
+   $USER /opt/ai-readiness-agent` first.
+
+After that, every push to `main` that passes tests redeploys automatically.
+Check progress under the repo's **Actions** tab; the deploy step prints the
+remote script's stdout/stderr either way.
+
 ## Running the tests
 
 ```bash
