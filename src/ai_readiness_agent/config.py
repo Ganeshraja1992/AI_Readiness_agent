@@ -111,6 +111,26 @@ class BedrockConfig:
 
 
 @dataclass
+class OpenRouterConfig:
+    # Third content-analysis engine, tried between the direct Anthropic API
+    # and the Amazon Bedrock fallback -- for setups (e.g. a hackathon team
+    # issued a shared OpenRouter key instead of its own Anthropic/AWS
+    # account) that only have an OpenRouter key. Off by default unless a key
+    # is present, same pattern as LLMConfig.
+    api_key: str = os.environ.get("OPENROUTER_API_KEY", "")
+    model: str = os.environ.get("READINESS_OPENROUTER_MODEL", "anthropic.claude-sonnet-5")
+    # Defaults to the public OpenRouter API. Some setups (e.g. a hackathon-
+    # issued key) route through a custom gateway instead -- if this fails
+    # with a 404/wrong-endpoint error, that's the first thing to check.
+    base_url: str = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1/chat/completions")
+    max_samples: int = int(os.environ.get("READINESS_LLM_MAX_SAMPLES", "40"))
+
+    @property
+    def active(self) -> bool:
+        return bool(self.api_key)
+
+
+@dataclass
 class ComprehendConfig:
     # Real AWS PII detection (Amazon Comprehend's DetectPiiEntities) run
     # alongside the zero-cost regex heuristic in profiling/pii.py, for S3
@@ -156,6 +176,7 @@ class AgentConfig:
     rds: RDSConfig = field(default_factory=RDSConfig)
     documents: DocumentsConfig = field(default_factory=DocumentsConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
+    openrouter: OpenRouterConfig = field(default_factory=OpenRouterConfig)
     bedrock: BedrockConfig = field(default_factory=BedrockConfig)
     comprehend: ComprehendConfig = field(default_factory=ComprehendConfig)
     channel: SecureChannelConfig = field(default_factory=SecureChannelConfig)

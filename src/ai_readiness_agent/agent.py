@@ -31,7 +31,7 @@ from ai_readiness_agent.ingestion.base import SourceBatch
 from ai_readiness_agent.ingestion.documents_adapter import DocumentsAdapter
 from ai_readiness_agent.ingestion.rds_adapter import RDSAdapter
 from ai_readiness_agent.ingestion.s3_adapter import S3Adapter
-from ai_readiness_agent.profiling import bedrock_analyzer, llm_analyzer
+from ai_readiness_agent.profiling import bedrock_analyzer, llm_analyzer, openrouter_analyzer
 from ai_readiness_agent.profiling.models import LLMContentAnalysis
 from ai_readiness_agent.profiling.profiler import build_data_profile
 
@@ -113,24 +113,35 @@ class AIReadinessAgent:
             len(data_profile.sources),
         )
 
+        # Try, in order, the direct Anthropic API, then OpenRouter (for
+        # setups with only a shared/hackathon OpenRouter key), then Amazon
+        # Bedrock -- each only if the previous one didn't produce a result.
+        # Errors from every *actually attempted* engine (skipped ones, with
+        # no key/not enabled, don't count) are collected so a failure two
+        # steps in doesn't silently hide what happened with the first.
         resolved_use_case = use_case or self.config.use_case
+        attempted_errors: list[tuple[str, str]] = []
+
         data_profile.llm_analysis = llm_analyzer.analyze(data_profile, resolved_use_case, self.config.llm)
+        if data_profile.llm_analysis.error:
+            attempted_errors.append(("anthropic", data_profile.llm_analysis.error))
+
+        if not data_profile.llm_analysis.performed and self.config.openrouter.active:
+            logger.info("Anthropic content analysis unavailable; falling back to OpenRouter.")
+            data_profile.llm_analysis = openrouter_analyzer.analyze(data_profile, resolved_use_case, self.config.openrouter)
+            if data_profile.llm_analysis.error:
+                attempted_errors.append(("openrouter", data_profile.llm_analysis.error))
+
         if not data_profile.llm_analysis.performed and self.config.bedrock.enabled:
-            anthropic_error = data_profile.llm_analysis.error
-            logger.info(
-                "Anthropic content analysis unavailable (%s); falling back to Amazon Bedrock.",
-                anthropic_error,
-            )
+            logger.info("Anthropic/OpenRouter content analysis unavailable; falling back to Amazon Bedrock.")
             data_profile.llm_analysis = bedrock_analyzer.analyze(data_profile, resolved_use_case, self.config.bedrock)
-            # Surface both attempts' errors -- otherwise a Bedrock failure
-            # silently hides whatever happened with the Anthropic attempt,
-            # making it impossible to tell from the result alone whether a
-            # fixed Anthropic key actually worked.
-            if not data_profile.llm_analysis.performed and anthropic_error:
-                bedrock_error = data_profile.llm_analysis.error
-                data_profile.llm_analysis = LLMContentAnalysis(
-                    error=f"anthropic: {anthropic_error} | bedrock: {bedrock_error}"
-                )
+            if data_profile.llm_analysis.error:
+                attempted_errors.append(("bedrock", data_profile.llm_analysis.error))
+
+        if not data_profile.llm_analysis.performed and len(attempted_errors) > 1:
+            data_profile.llm_analysis = LLMContentAnalysis(
+                error=" | ".join(f"{name}: {err}" for name, err in attempted_errors)
+            )
         if data_profile.llm_analysis.performed:
             logger.info(
                 "LLM content analysis (%s): %d sensitive finding(s), %d quality issue(s).",

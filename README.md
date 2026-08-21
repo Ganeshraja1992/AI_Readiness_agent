@@ -432,7 +432,8 @@ real credentials with no code changes:
 | `READINESS_RDS_HOST/PORT/DATABASE/TABLE/USER/PASSWORD` | RDS source config |
 | `READINESS_DOCUMENTS_DIR` | folder to scan for documents |
 | `ANTHROPIC_API_KEY`, `READINESS_LLM_MODEL` | direct-Anthropic content-analysis engine (tried first) |
-| `READINESS_BEDROCK_ENABLED`, `READINESS_BEDROCK_MODEL_ID`, `AWS_BEDROCK_REGION` | Amazon Bedrock content-analysis fallback (tried if Anthropic fails) |
+| `OPENROUTER_API_KEY`, `READINESS_OPENROUTER_MODEL`, `OPENROUTER_BASE_URL` | OpenRouter content-analysis engine (tried if Anthropic fails/isn't configured); base URL defaults to the public OpenRouter API, override for a custom gateway |
+| `READINESS_BEDROCK_ENABLED`, `READINESS_BEDROCK_MODEL_ID`, `AWS_BEDROCK_REGION` | Amazon Bedrock content-analysis fallback (tried if Anthropic and OpenRouter both fail) |
 | `READINESS_ENVIRONMENT_ID`, `READINESS_USE_CASE` | defaults for standalone runs |
 | `READINESS_AGENT_ID` | agent identity sent with every submission |
 | `CONTROL_PLANE_URL`, `CONTROL_PLANE_SHARED_SECRET`, `CONTROL_PLANE_TIMEOUT`, `CONTROL_PLANE_MAX_RETRIES` | Secure Result Channel target |
