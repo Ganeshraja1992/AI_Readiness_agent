@@ -99,7 +99,14 @@ class BedrockConfig:
     # this account/region before first use.
     enabled: bool = _bool_env("READINESS_BEDROCK_ENABLED", False)
     region: str = os.environ.get("AWS_BEDROCK_REGION", os.environ.get("AWS_REGION", "us-east-1"))
-    model_id: str = os.environ.get("READINESS_BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0")
+    # Bedrock's Anthropic model catalog changes over time (older versions
+    # get retired -- e.g. claude-3-5-sonnet-20241022-v2:0 has reached
+    # end-of-life). If this default 404s/ResourceNotFoundExceptions,
+    # check the Bedrock console's model catalog for this account/region
+    # and set READINESS_BEDROCK_MODEL_ID to whatever's actually current --
+    # newer models sometimes need a region-prefixed inference-profile ID
+    # (e.g. "us.anthropic.claude-...") rather than the bare model ID.
+    model_id: str = os.environ.get("READINESS_BEDROCK_MODEL_ID", "anthropic.claude-3-7-sonnet-20250219-v1:0")
     max_samples: int = int(os.environ.get("READINESS_LLM_MAX_SAMPLES", "40"))
 
 

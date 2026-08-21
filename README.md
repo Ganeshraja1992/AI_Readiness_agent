@@ -145,9 +145,12 @@ Bedrock fallback on by default (`READINESS_BEDROCK_ENABLED`); it needs:
   long-established action name every IAM policy editor recognizes)
 - **Model access granted in the Bedrock console** for the model in
   `READINESS_BEDROCK_MODEL_ID` (default
-  `anthropic.claude-3-5-sonnet-20241022-v2:0`) — unlike Comprehend, a
+  `anthropic.claude-3-7-sonnet-20250219-v1:0`) — unlike Comprehend, a
   correct IAM policy alone isn't enough; Bedrock requires this separate,
   one-time per-account/region opt-in before the first call succeeds.
+  Bedrock's Anthropic model catalog changes over time (older versions get
+  retired); if the default 404s, check the Bedrock console's model
+  catalog for what's actually current in your account/region.
 
 Or with Compose, which wires up the same mount and reads env vars from a
 file instead of a long `-e` list:
