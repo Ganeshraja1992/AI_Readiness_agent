@@ -140,7 +140,9 @@ Bedrock (same model family, billed through AWS) if the direct call fails
 for any reason — no key configured, invalid key, network error, or a
 billing/credit issue on the Anthropic account. The webapp turns the
 Bedrock fallback on by default (`READINESS_BEDROCK_ENABLED`); it needs:
-- `bedrock:InvokeModel` (or `bedrock:Converse`) on the instance's IAM role
+- `bedrock:InvokeModel` on the instance's IAM role (uses InvokeModel, not
+  the newer Converse API, specifically so this only needs the one
+  long-established action name every IAM policy editor recognizes)
 - **Model access granted in the Bedrock console** for the model in
   `READINESS_BEDROCK_MODEL_ID` (default
   `anthropic.claude-3-5-sonnet-20241022-v2:0`) — unlike Comprehend, a
