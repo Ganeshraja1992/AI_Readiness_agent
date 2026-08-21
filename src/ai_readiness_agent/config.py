@@ -118,7 +118,7 @@ class OpenRouterConfig:
     # account) that only have an OpenRouter key. Off by default unless a key
     # is present, same pattern as LLMConfig.
     api_key: str = os.environ.get("OPENROUTER_API_KEY", "")
-    model: str = os.environ.get("READINESS_OPENROUTER_MODEL", "anthropic.claude-sonnet-5")
+    model: str = os.environ.get("READINESS_OPENROUTER_MODEL", "anthropic/claude-sonnet-5")
     # Defaults to the public OpenRouter API. Some setups (e.g. a hackathon-
     # issued key) route through a custom gateway instead -- if this fails
     # with a 404/wrong-endpoint error, that's the first thing to check.
