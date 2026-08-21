@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Running analysis — AI Readiness Agent{% endblock %}
+{% block content %}
+
+<div class="card" id="progress-card">
+  <h2>Running analysis…</h2>
+  <p class="small-note" id="progress-stage">Starting…</p>
+  <div class="meter-track"><div class="meter-fill" id="progress-fill" style="width: 4%;"></div></div>
+  <p class="small-note" style="margin-top: 14px;">
+    This runs real AWS/LLM calls (S3, RDS, Comprehend, the LLM content-analysis
+    engine) and can take anywhere from a few seconds to around a minute
+    depending on data volume. This page updates itself — no need to reload.
+  </p>
+  <div id="progress-error" class="error-banner" role="alert" style="display: none; margin-top: 14px;"></div>
+  <p id="progress-error-link" style="display: none; margin-top: 14px;">
+    <a href="{{ connect_url }}">&larr; Back to Connect / Upload Data</a>
+  </p>
+</div>
+
+<script>
+  (function () {
+    var jobId = {{ job_id | tojson }};
+    var resultUrlTemplate = {{ result_url_template | tojson }};
+    var stageEl = document.getElementById("progress-stage");
+    var fillEl = document.getElementById("progress-fill");
+    var errorEl = document.getElementById("progress-error");
+    var errorLinkEl = document.getElementById("progress-error-link");
+
+    // Rough percentages for each known stage string agent.py reports via
+    // on_progress -- purely a perceived-progress indicator, not an exact
+    // measurement, since the underlying work isn't broken down finer than
+    // this without slowing down the actual scan to instrument it.
+    var STAGE_PROGRESS = [
+      ["Starting", 5],
+      ["Ingesting data", 20],
+      ["Profiling data quality", 45],
+      ["Running AI content analysis", 65],
+      ["Scoring AI readiness", 85],
+      ["Finalizing", 95]
+    ];
+
+    function percentForStage(stage) {
+      for (var i = 0; i < STAGE_PROGRESS.length; i++) {
+        if (stage && stage.indexOf(STAGE_PROGRESS[i][0]) === 0) return STAGE_PROGRESS[i][1];
+      }
+      return 10;
+    }
+
+    function poll() {
+      fetch("/run/status/" + jobId, { headers: { "Accept": "application/json" } })
+        .then(function (resp) { return resp.json(); })
+        .then(function (job) {
+          if (job.status === "done") {
+            stageEl.textContent = "Done — loading results…";
+            fillEl.style.width = "100%";
+            window.location.href = resultUrlTemplate.replace("__ID__", job.assessment_id);
+            return;
+          }
+          if (job.status === "error") {
+            stageEl.textContent = "Analysis failed.";
+            errorEl.textContent = job.error || "Unknown error.";
+            errorEl.style.display = "";
+            errorLinkEl.style.display = "";
+            return;
+          }
+          stageEl.textContent = job.stage || "Working…";
+          fillEl.style.width = percentForStage(job.stage) + "%";
+          setTimeout(poll, 1000);
+        })
+        .catch(function () {
+          // Transient network hiccup polling our own server -- retry rather
+          // than giving up on one failed request.
+          setTimeout(poll, 2000);
+        });
+    }
+
+    poll();
+  })();
+</script>
+
+{% endblock %}

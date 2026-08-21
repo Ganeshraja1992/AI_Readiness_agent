@@ -21,6 +21,7 @@ Result Channel.
 from __future__ import annotations
 
 import logging
+from typing import Callable
 
 from ai_readiness_agent import audit_store
 from ai_readiness_agent.assessment.models import AssessmentResult
@@ -94,6 +95,7 @@ class AIReadinessAgent:
         sources: set[str] | None = None,
         s3_include_data: bool = True,
         s3_include_security: bool = True,
+        on_progress: Callable[[str], None] | None = None,
     ) -> tuple[AssessmentResult, DeliveryReceipt | None]:
         """Run the full pipeline once: ingest -> profile -> score -> deliver.
 
@@ -104,8 +106,20 @@ class AIReadinessAgent:
 
         `sources` / `s3_include_data` / `s3_include_security` restrict which
         adapters run this pass — see `ingest()`.
+
+        `on_progress`, if given, is called with a short human-readable stage
+        description at each major step -- the webapp uses this to drive a
+        real progress page instead of blocking silently on what can be a
+        multi-second run of real AWS/LLM calls.
         """
+        def _progress(stage: str) -> None:
+            if on_progress:
+                on_progress(stage)
+
+        _progress("Ingesting data from connected sources…")
         batches = self.ingest(sources, s3_include_data=s3_include_data, s3_include_security=s3_include_security)
+
+        _progress("Profiling data quality…")
         data_profile = build_data_profile(self.config.customer_id, batches, comprehend_config=self.config.comprehend)
         logger.info(
             "Data profile built: %d record(s) across %d source(s).",
@@ -122,6 +136,7 @@ class AIReadinessAgent:
         resolved_use_case = use_case or self.config.use_case
         attempted_errors: list[tuple[str, str]] = []
 
+        _progress("Running AI content analysis…")
         data_profile.llm_analysis = llm_analyzer.analyze(data_profile, resolved_use_case, self.config.llm)
         if data_profile.llm_analysis.error:
             attempted_errors.append(("anthropic", data_profile.llm_analysis.error))
@@ -150,6 +165,7 @@ class AIReadinessAgent:
                 len(data_profile.llm_analysis.quality_issues),
             )
 
+        _progress("Scoring AI readiness…")
         result = assess(
             data_profile,
             use_case=resolved_use_case,
@@ -163,6 +179,7 @@ class AIReadinessAgent:
             result.projected_score,
         )
 
+        _progress("Finalizing and delivering results…")
         audit_path = audit_store.write_audit(self.config, result)
         logger.info("Full assessment (with Data Profile) written to audit trail: %s", audit_path)
 

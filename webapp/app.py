@@ -33,6 +33,7 @@ from __future__ import annotations
 import functools
 import os
 import sys
+import threading
 import uuid
 from pathlib import Path
 
@@ -44,7 +45,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(ROOT / "src"))
 
-from flask import Flask, Response, redirect, render_template, request, session, url_for  # noqa: E402
+from flask import Flask, Response, jsonify, redirect, render_template, request, session, url_for  # noqa: E402
 from werkzeug.utils import secure_filename  # noqa: E402
 
 import connectors  # noqa: E402
@@ -100,6 +101,61 @@ def _config():
     config.s3.use_mock = False
     config.rds.use_mock = False
     return config
+
+
+# ----------------------------------------------------------------------
+# Background scan jobs -- a real "Analyzing…" progress page instead of a
+# generic loading overlay for what can be a multi-second run of real
+# S3/RDS/Comprehend/LLM calls. State lives in an in-memory dict rather than
+# DynamoDB since this is deliberately a single-user demo app; that only
+# works correctly with a single web worker process (see Dockerfile).
+_SCAN_JOBS: dict[str, dict] = {}
+_SCAN_JOBS_LOCK = threading.Lock()
+
+
+def _job_set(job_id: str, **fields) -> None:
+    with _SCAN_JOBS_LOCK:
+        _SCAN_JOBS.setdefault(job_id, {}).update(fields)
+
+
+def _job_get(job_id: str) -> dict | None:
+    with _SCAN_JOBS_LOCK:
+        job = _SCAN_JOBS.get(job_id)
+        return dict(job) if job is not None else None
+
+
+def _run_scan_job(
+    job_id: str,
+    config,
+    *,
+    use_case: str | None,
+    environment_id: str | None,
+    sources: set[str],
+    s3_include_data: bool,
+    s3_include_security: bool,
+    upload_prefix: str | None,
+) -> None:
+    """Runs in a background thread -- must not touch flask.session/request,
+    which are only valid on the request that spawned it. Everything this
+    needs was captured as plain arguments before the thread started."""
+    try:
+        agent = AIReadinessAgent(config)
+        result, _receipt = agent.run(
+            deliver=True,
+            use_case=use_case,
+            environment_id=environment_id,
+            sources=sources,
+            s3_include_data=s3_include_data,
+            s3_include_security=s3_include_security,
+            on_progress=lambda stage: _job_set(job_id, stage=stage),
+        )
+        _job_set(job_id, status="done", assessment_id=result.assessment_id)
+    except Exception as exc:  # noqa: BLE001 - surface any failure to the polling page instead of crashing a bare thread
+        _job_set(job_id, status="error", error=str(exc))
+    finally:
+        if upload_prefix:
+            _delete_uploaded_documents(config, upload_prefix)
+
 
 _READINESS_BADGE = {
     "NOT_READY": "critical",
@@ -495,7 +551,7 @@ def _delete_uploaded_documents(config, prefix: str) -> None:
             client.delete_objects(Bucket=config.documents.bucket, Delete={"Objects": keys})
 
 
-_VALID_ACTIONS = {"s3", "security", "documents", "rds"}
+_VALID_ACTIONS = {"s3", "security", "documents", "rds", "full"}
 
 
 @app.route("/run", methods=["POST"])
@@ -535,6 +591,24 @@ def run_assessment():
             return _error("No RDS connector configured. Connect a database above first.")
         _apply_rds_connector(config, connector)
         sources = {"rds"}
+    elif action == "full":
+        # Combines every persistent connector that's actually configured --
+        # a holistic score across the whole connected data estate, not just
+        # one source at a time. Uploaded documents aren't included since
+        # those require a fresh upload per run rather than being a saved
+        # connector; use the dedicated "Assess uploaded documents" action
+        # for that.
+        s3_connector = connectors.load_s3_connector()
+        rds_connector = connectors.load_rds_connector()
+        if not s3_connector and not rds_connector:
+            return _error("Connect an S3 bucket and/or an RDS database above first.")
+        sources = set()
+        if s3_connector:
+            _apply_s3_connector(config, s3_connector)
+            sources.add("s3")
+        if rds_connector:
+            _apply_rds_connector(config, rds_connector)
+            sources.add("rds")
     else:  # action == "documents"
         upload_prefix = _upload_documents_to_s3(config, request.files.getlist("documents"))
         if not upload_prefix:
@@ -542,23 +616,39 @@ def run_assessment():
         config.documents.s3_prefix = upload_prefix
         sources = {"documents"}
 
-    try:
-        agent = AIReadinessAgent(config)
-        result, receipt = agent.run(
-            deliver=True,
+    job_id = str(uuid.uuid4())
+    _job_set(job_id, status="running", stage="Starting…", assessment_id=None, error=None)
+    threading.Thread(
+        target=_run_scan_job,
+        kwargs=dict(
+            job_id=job_id,
+            config=config,
             use_case=use_case,
             environment_id=environment_id,
             sources=sources,
             s3_include_data=s3_include_data,
             s3_include_security=s3_include_security,
-        )
-    finally:
-        if upload_prefix:
-            _delete_uploaded_documents(config, upload_prefix)
+            upload_prefix=upload_prefix,
+        ),
+        daemon=True,
+    ).start()
 
-    # Steps 3-7: hand the freshly computed result to the guided reveal,
-    # starting at "Analyze Data Estate".
-    return redirect(url_for("wizard_result", assessment_id=result.assessment_id, stage=RESULT_STAGES[0]))
+    return render_template(
+        "scan_progress.html",
+        user=session.get("user"),
+        job_id=job_id,
+        result_url_template=url_for("wizard_result", assessment_id="__ID__", stage=RESULT_STAGES[0]),
+        connect_url=url_for("wizard_step2", use_case=use_case, environment_id=environment_id),
+    )
+
+
+@app.route("/run/status/<job_id>")
+@login_required
+def run_status(job_id: str):
+    job = _job_get(job_id)
+    if job is None:
+        return jsonify({"status": "error", "error": "Unknown job."}), 404
+    return jsonify(job)
 
 
 def _load_assessment(assessment_id: str):

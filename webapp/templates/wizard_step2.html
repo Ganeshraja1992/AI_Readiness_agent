@@ -14,6 +14,22 @@
 <div class="card">
   <h2>2. Connect / upload data</h2>
 
+  {% if s3_connector or rds_connector %}
+  <div class="sub-section">
+    <h3>Run full analysis</h3>
+    <p class="small-note">
+      Scans every connected source below together, for one holistic
+      readiness score across your whole connected data estate
+      {%- if s3_connector and rds_connector %} (S3 + RDS){% elif s3_connector %} (S3 only — connect RDS too for a combined score){% else %} (RDS only — connect S3 too for a combined score){% endif %}.
+    </p>
+    <form method="post" action="{{ url_for('run_assessment') }}">
+      <input type="hidden" name="use_case" value="{{ use_case }}">
+      <input type="hidden" name="environment_id" value="{{ environment_id }}">
+      <button type="submit" name="action" value="full">Run full analysis</button>
+    </form>
+  </div>
+  {% endif %}
+
   <div class="sub-section">
     <h3>Scan S3 bucket</h3>
     {% if s3_connector %}
@@ -155,8 +171,8 @@
   </div>
 
   <p class="small-note">
-    Each action ingests its own source and carries you straight into steps
-    3-7 (Analyze &rarr; Calculate &rarr; Blockers &rarr; Remediation &rarr; Projected)
+    Each action ingests its selected source(s) and carries you straight into
+    steps 3-7 (Analyze &rarr; Calculate &rarr; Blockers &rarr; Remediation &rarr; Projected)
     for that data.
   </p>
 </div>

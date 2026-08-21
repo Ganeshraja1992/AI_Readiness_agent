@@ -37,4 +37,11 @@ EXPOSE 5000
 
 # 120s worker timeout: real S3/RDS/Comprehend/Anthropic calls in a single
 # request can legitimately take longer than gunicorn's 30s default.
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "webapp.app:app"]
+#
+# Exactly 1 worker: the background scan-job tracking (webapp/app.py's
+# _SCAN_JOBS) is a plain in-memory dict, not shared across processes -- a
+# second worker would mean the page polling for a job's progress could hit
+# a different process than the one running it and see "unknown job". Fine
+# for this single-user demo app; would need a shared store (e.g. the same
+# DynamoDB table already used for audit results) to scale past one worker.
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "120", "webapp.app:app"]

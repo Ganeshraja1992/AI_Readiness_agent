@@ -10,6 +10,7 @@ Control Plane invokes this engine but must not reinterpret or duplicate it.
 from __future__ import annotations
 
 import uuid
+from collections import Counter
 
 from ai_readiness_agent.assessment.models import (
     AssessmentResult,
@@ -284,19 +285,21 @@ def _ai_content_analysis(profile: DataProfile, weight: float, findings: list[Fin
         )
 
     score = max(0.0, 100.0 - penalty)
-    critical_count = sum(1 for f in analysis.sensitive_data_findings if f.severity == "critical")
-    engine_label = {"anthropic": "Anthropic Claude", "bedrock": "Amazon Bedrock", "openrouter": "OpenRouter"}.get(
-        analysis.engine, "LLM"
-    )
-    # State this dimension's own score explicitly, and clearly separate it
-    # from use_case_fit_score below -- otherwise readers see two different
-    # 0-100 numbers in the same sentence and reasonably assume the bar
-    # isn't reflecting whichever one is quoted in the text.
-    summary = (
-        f"{engine_label} flagged {len(analysis.sensitive_data_findings)} sensitive-content finding(s) "
-        f"({critical_count} critical) and {len(analysis.quality_issues)} quality issue(s) in sampled "
-        f"content, scoring this dimension {score:.0f}/100."
-    )
+    # Describe what was actually found, not which engine ran it -- the kind
+    # breakdown is the useful part, the engine name isn't. State this
+    # dimension's own score explicitly and clearly separate it from
+    # use_case_fit_score below -- otherwise readers see two different 0-100
+    # numbers in the same sentence and reasonably assume the bar isn't
+    # reflecting whichever one is quoted in the text.
+    if analysis.sensitive_data_findings:
+        kind_counts = Counter(f.kind for f in analysis.sensitive_data_findings)
+        findings_desc = "sensitive content: " + ", ".join(f"{n} {kind}" for kind, n in kind_counts.most_common())
+    else:
+        findings_desc = "no sensitive-content findings"
+    summary = f"Flagged {findings_desc}"
+    if analysis.quality_issues:
+        summary += f" and {len(analysis.quality_issues)} data quality issue(s)"
+    summary += f" in sampled content, scoring this dimension {score:.0f}/100."
     if analysis.use_case_fit_score is not None:
         summary += (
             f" Separately (not part of this dimension's score), the LLM also judged how well this "
