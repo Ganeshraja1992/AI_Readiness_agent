@@ -133,6 +133,20 @@ assumed role from `aws sso login` works fine) so the container can reach
 S3, RDS, SSM, DynamoDB, and Comprehend. Add `-e ANTHROPIC_API_KEY=...` to
 enable the LLM content-analysis dimension.
 
+That dimension has two engines, tried in order (see
+`profiling/llm_analyzer.py` / `profiling/bedrock_analyzer.py` /
+`agent.py`): a direct Anthropic API call first, falling back to Amazon
+Bedrock (same model family, billed through AWS) if the direct call fails
+for any reason — no key configured, invalid key, network error, or a
+billing/credit issue on the Anthropic account. The webapp turns the
+Bedrock fallback on by default (`READINESS_BEDROCK_ENABLED`); it needs:
+- `bedrock:InvokeModel` (or `bedrock:Converse`) on the instance's IAM role
+- **Model access granted in the Bedrock console** for the model in
+  `READINESS_BEDROCK_MODEL_ID` (default
+  `anthropic.claude-3-5-sonnet-20241022-v2:0`) — unlike Comprehend, a
+  correct IAM policy alone isn't enough; Bedrock requires this separate,
+  one-time per-account/region opt-in before the first call succeeds.
+
 Or with Compose, which wires up the same mount and reads env vars from a
 file instead of a long `-e` list:
 
@@ -388,6 +402,8 @@ real credentials with no code changes:
 | `READINESS_RDS_ENGINE` | `postgresql` (default), `mysql`, `mariadb`, `oracle`, or `mssql` |
 | `READINESS_RDS_HOST/PORT/DATABASE/TABLE/USER/PASSWORD` | RDS source config |
 | `READINESS_DOCUMENTS_DIR` | folder to scan for documents |
+| `ANTHROPIC_API_KEY`, `READINESS_LLM_MODEL` | direct-Anthropic content-analysis engine (tried first) |
+| `READINESS_BEDROCK_ENABLED`, `READINESS_BEDROCK_MODEL_ID`, `AWS_BEDROCK_REGION` | Amazon Bedrock content-analysis fallback (tried if Anthropic fails) |
 | `READINESS_ENVIRONMENT_ID`, `READINESS_USE_CASE` | defaults for standalone runs |
 | `READINESS_AGENT_ID` | agent identity sent with every submission |
 | `CONTROL_PLANE_URL`, `CONTROL_PLANE_SHARED_SECRET`, `CONTROL_PLANE_TIMEOUT`, `CONTROL_PLANE_MAX_RETRIES` | Secure Result Channel target |

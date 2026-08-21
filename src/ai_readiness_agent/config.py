@@ -84,6 +84,26 @@ class LLMConfig:
 
 
 @dataclass
+class BedrockConfig:
+    # Fallback content-analysis engine for when the direct Anthropic API
+    # call fails (billing/credit issues, network, invalid key, or no key
+    # configured at all) -- see llm_analyzer.py / bedrock_analyzer.py /
+    # agent.py's try-Claude-then-Bedrock chain. Runs Claude via Amazon
+    # Bedrock instead, billed through AWS and authenticated with the same
+    # credentials already used for S3/RDS/DynamoDB/Comprehend -- no
+    # separate Anthropic account needed. Off by default so the CLI/tests
+    # still need no AWS account; the webapp turns this on.
+    #
+    # Requires bedrock:InvokeModel (or Converse) IAM permission, and the
+    # model must have "model access" granted in the Bedrock console for
+    # this account/region before first use.
+    enabled: bool = _bool_env("READINESS_BEDROCK_ENABLED", False)
+    region: str = os.environ.get("AWS_BEDROCK_REGION", os.environ.get("AWS_REGION", "us-east-1"))
+    model_id: str = os.environ.get("READINESS_BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0")
+    max_samples: int = int(os.environ.get("READINESS_LLM_MAX_SAMPLES", "40"))
+
+
+@dataclass
 class ComprehendConfig:
     # Real AWS PII detection (Amazon Comprehend's DetectPiiEntities) run
     # alongside the zero-cost regex heuristic in profiling/pii.py, for S3
@@ -129,6 +149,7 @@ class AgentConfig:
     rds: RDSConfig = field(default_factory=RDSConfig)
     documents: DocumentsConfig = field(default_factory=DocumentsConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
+    bedrock: BedrockConfig = field(default_factory=BedrockConfig)
     comprehend: ComprehendConfig = field(default_factory=ComprehendConfig)
     channel: SecureChannelConfig = field(default_factory=SecureChannelConfig)
     # Full assessment results (including the Data Profile, which can contain

@@ -63,6 +63,7 @@ class LLMContentAnalysis(BaseModel):
     the selected AI use case)."""
 
     performed: bool = False
+    engine: str = ""  # "anthropic" or "bedrock" -- whichever actually produced this result
     sensitive_data_findings: list[LLMSensitiveFinding] = Field(default_factory=list)
     quality_issues: list[LLMQualityIssue] = Field(default_factory=list)
     use_case_fit_score: float | None = None

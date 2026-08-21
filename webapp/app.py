@@ -89,6 +89,7 @@ def _config():
     config.audit_backend = "dynamodb"
     config.documents.bucket = DOCUMENTS_BUCKET
     config.comprehend.enabled = True
+    config.bedrock.enabled = True
     return config
 
 _READINESS_BADGE = {

@@ -31,7 +31,7 @@ from ai_readiness_agent.ingestion.base import SourceBatch
 from ai_readiness_agent.ingestion.documents_adapter import DocumentsAdapter
 from ai_readiness_agent.ingestion.rds_adapter import RDSAdapter
 from ai_readiness_agent.ingestion.s3_adapter import S3Adapter
-from ai_readiness_agent.profiling import llm_analyzer
+from ai_readiness_agent.profiling import bedrock_analyzer, llm_analyzer
 from ai_readiness_agent.profiling.profiler import build_data_profile
 
 logger = logging.getLogger(__name__)
@@ -114,9 +114,16 @@ class AIReadinessAgent:
 
         resolved_use_case = use_case or self.config.use_case
         data_profile.llm_analysis = llm_analyzer.analyze(data_profile, resolved_use_case, self.config.llm)
+        if not data_profile.llm_analysis.performed and self.config.bedrock.enabled:
+            logger.info(
+                "Anthropic content analysis unavailable (%s); falling back to Amazon Bedrock.",
+                data_profile.llm_analysis.error,
+            )
+            data_profile.llm_analysis = bedrock_analyzer.analyze(data_profile, resolved_use_case, self.config.bedrock)
         if data_profile.llm_analysis.performed:
             logger.info(
-                "LLM content analysis: %d sensitive finding(s), %d quality issue(s).",
+                "LLM content analysis (%s): %d sensitive finding(s), %d quality issue(s).",
+                data_profile.llm_analysis.engine,
                 len(data_profile.llm_analysis.sensitive_data_findings),
                 len(data_profile.llm_analysis.quality_issues),
             )

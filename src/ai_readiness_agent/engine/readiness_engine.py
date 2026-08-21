@@ -255,7 +255,10 @@ def _ai_content_analysis(profile: DataProfile, weight: float, findings: list[Fin
             name="ai_content_analysis",
             score=50.0,
             weight=weight,
-            summary=f"LLM content analysis was not performed{reason}. Set ANTHROPIC_API_KEY to enable it.",
+            summary=(
+                f"LLM content analysis was not performed{reason}. "
+                "Set ANTHROPIC_API_KEY, or enable the Amazon Bedrock fallback, to use it."
+            ),
         )
 
     penalty = 0.0
@@ -285,7 +288,8 @@ def _ai_content_analysis(profile: DataProfile, weight: float, findings: list[Fin
     if analysis.use_case_fit_score is not None:
         fit_note = f" Use-case fit (LLM-assessed): {analysis.use_case_fit_score:.0f}/100 — {analysis.use_case_fit_notes}"
     total_issues = len(analysis.sensitive_data_findings) + len(analysis.quality_issues)
-    summary = f"LLM reviewed sampled content and flagged {total_issues} potential issue(s).{fit_note}"
+    engine_label = {"anthropic": "Anthropic Claude", "bedrock": "Amazon Bedrock"}.get(analysis.engine, "LLM")
+    summary = f"{engine_label} reviewed sampled content and flagged {total_issues} potential issue(s).{fit_note}"
     return DimensionScore(
         name="ai_content_analysis",
         score=round(score, 1),
