@@ -115,11 +115,19 @@ class AIReadinessAgent:
         resolved_use_case = use_case or self.config.use_case
         data_profile.llm_analysis = llm_analyzer.analyze(data_profile, resolved_use_case, self.config.llm)
         if not data_profile.llm_analysis.performed and self.config.bedrock.enabled:
+            anthropic_error = data_profile.llm_analysis.error
             logger.info(
                 "Anthropic content analysis unavailable (%s); falling back to Amazon Bedrock.",
-                data_profile.llm_analysis.error,
+                anthropic_error,
             )
             data_profile.llm_analysis = bedrock_analyzer.analyze(data_profile, resolved_use_case, self.config.bedrock)
+            # Surface both attempts' errors -- otherwise a Bedrock failure
+            # silently hides whatever happened with the Anthropic attempt,
+            # making it impossible to tell from the result alone whether a
+            # fixed Anthropic key actually worked.
+            if not data_profile.llm_analysis.performed and anthropic_error:
+                bedrock_error = data_profile.llm_analysis.error
+                data_profile.llm_analysis.error = f"anthropic: {anthropic_error} | bedrock: {bedrock_error}"
         if data_profile.llm_analysis.performed:
             logger.info(
                 "LLM content analysis (%s): %d sensitive finding(s), %d quality issue(s).",
