@@ -36,6 +36,19 @@ def _schema_instructions() -> str:
     )
 
 
+def _strip_code_fence(text: str) -> str:
+    """Some models routed through OpenRouter wrap JSON-mode output in a
+    ```json ... ``` fence despite `response_format: json_object` and being
+    told not to -- confirmed directly against the live API. Strip it so a
+    perfectly valid response doesn't fail to parse."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+        if text.endswith("```"):
+            text = text[:-3]
+    return text.strip()
+
+
 def analyze(profile: DataProfile, use_case: str, config: OpenRouterConfig) -> LLMContentAnalysis:
     """Run the OpenRouter content analysis. Never raises -- network, auth,
     and parsing failures degrade to `performed=False` with `error` set."""
@@ -81,7 +94,7 @@ def analyze(profile: DataProfile, use_case: str, config: OpenRouterConfig) -> LL
 
     text = (choice.get("message") or {}).get("content", "")
     try:
-        data = json.loads(text)
+        data = json.loads(_strip_code_fence(text))
     except (json.JSONDecodeError, TypeError) as exc:
         return LLMContentAnalysis(performed=False, error=f"could not parse model response: {exc}")
 

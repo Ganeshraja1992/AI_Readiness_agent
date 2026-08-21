@@ -90,7 +90,15 @@ def _config():
     config.audit_backend = "dynamodb"
     config.documents.bucket = DOCUMENTS_BUCKET
     config.comprehend.enabled = True
-    config.bedrock.enabled = True
+    # Bedrock disabled: this account's model access is stale/unavailable and
+    # OpenRouter (llm_analyzer -> openrouter_analyzer chain) covers content
+    # analysis instead. See agent.py's engine chain.
+    config.bedrock.enabled = False
+    # Demo/MVP: never silently fall back to mock_data/ -- if a real S3/RDS
+    # connector isn't configured, scanning that source should fail loudly
+    # rather than show fake data.
+    config.s3.use_mock = False
+    config.rds.use_mock = False
     return config
 
 _READINESS_BADGE = {
