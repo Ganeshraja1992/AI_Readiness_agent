@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch: # manual "Run workflow" button, for re-testing a deploy without a new commit
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -25,17 +29,23 @@ jobs:
   deploy:
     name: Deploy to EC2
     needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write # required to mint the OIDC token for AssumeRoleWithWebIdentity
+      contents: read
     env:
       INSTANCE_ID: i-057b3cef11b2ba412
       APP_DIR: /opt/ai-readiness-agent
     steps:
-      - name: Configure AWS credentials
+      # Hackathon sandbox account blocks iam:CreateUser/CreateAccessKey, so
+      # this authenticates via GitHub's OIDC federation into a role scoped
+      # to ssm:SendCommand on this one instance -- no long-lived AWS keys
+      # stored as secrets at all.
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
       # One-time setup on the instance (see README's "GitHub Actions

@@ -32,6 +32,7 @@ from ai_readiness_agent.ingestion.documents_adapter import DocumentsAdapter
 from ai_readiness_agent.ingestion.rds_adapter import RDSAdapter
 from ai_readiness_agent.ingestion.s3_adapter import S3Adapter
 from ai_readiness_agent.profiling import bedrock_analyzer, llm_analyzer
+from ai_readiness_agent.profiling.models import LLMContentAnalysis
 from ai_readiness_agent.profiling.profiler import build_data_profile
 
 logger = logging.getLogger(__name__)
@@ -127,7 +128,9 @@ class AIReadinessAgent:
             # fixed Anthropic key actually worked.
             if not data_profile.llm_analysis.performed and anthropic_error:
                 bedrock_error = data_profile.llm_analysis.error
-                data_profile.llm_analysis.error = f"anthropic: {anthropic_error} | bedrock: {bedrock_error}"
+                data_profile.llm_analysis = LLMContentAnalysis(
+                    error=f"anthropic: {anthropic_error} | bedrock: {bedrock_error}"
+                )
         if data_profile.llm_analysis.performed:
             logger.info(
                 "LLM content analysis (%s): %d sensitive finding(s), %d quality issue(s).",
