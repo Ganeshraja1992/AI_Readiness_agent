@@ -36,6 +36,10 @@ class S3Config:
 
 @dataclass
 class RDSConfig:
+    # "postgresql" or "mysql" -- picks the SQLAlchemy dialect/driver in
+    # rds_adapter.py. Pointing the wrong dialect at a real server causes the
+    # connection to hang on a protocol mismatch rather than fail fast.
+    engine: str = os.environ.get("READINESS_RDS_ENGINE", "postgresql")
     host: str = os.environ.get("READINESS_RDS_HOST", "customer-db.cluster.rds.amazonaws.com")
     port: int = int(os.environ.get("READINESS_RDS_PORT", "5432"))
     database: str = os.environ.get("READINESS_RDS_DATABASE", "app")

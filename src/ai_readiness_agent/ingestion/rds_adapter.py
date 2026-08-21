@@ -21,6 +21,14 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_SAMPLE_LIMIT = 5000
 
+# RDSConfig.engine -> SQLAlchemy dialect+driver. Using the wrong one against
+# a real server doesn't fail fast -- the client sends the wrong wire
+# protocol and the connection just hangs until something times out.
+_DIALECT_DRIVERS = {
+    "postgresql": "postgresql+psycopg2",
+    "mysql": "mysql+pymysql",
+}
+
 
 class RDSAdapter(DataSourceAdapter):
     source_type = "rds"
@@ -63,12 +71,22 @@ class RDSAdapter(DataSourceAdapter):
         from sqlalchemy import create_engine, text  # lazy import
 
         batch = SourceBatch(source_type=self.source_type, source_name=self.config.table)
+        dialect = _DIALECT_DRIVERS.get(self.config.engine)
+        if dialect is None:
+            batch.errors.append(
+                f"unknown RDS engine {self.config.engine!r}; expected one of {sorted(_DIALECT_DRIVERS)}"
+            )
+            return batch
         url = (
-            f"postgresql+psycopg2://{self.config.username}:{self.config.password}"
+            f"{dialect}://{self.config.username}:{self.config.password}"
             f"@{self.config.host}:{self.config.port}/{self.config.database}"
         )
         try:
-            engine = create_engine(url, pool_pre_ping=True)
+            # A misconfigured security group / wrong host+port hangs the TCP
+            # handshake rather than failing fast -- cap it well under
+            # gunicorn's worker timeout so the request comes back with a
+            # real error instead of an empty/dropped connection.
+            engine = create_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 10})
             with engine.connect() as conn:
                 result = conn.execute(
                     text(f"SELECT * FROM {self.config.table} LIMIT :limit"),

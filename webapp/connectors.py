@@ -88,6 +88,7 @@ def delete_s3_connector() -> None:
 # RDS connector
 # ----------------------------------------------------------------------
 class RDSConnector(TypedDict):
+    engine: str
     host: str
     port: str
     database: str
@@ -103,9 +104,11 @@ def load_rds_connector() -> Optional[RDSConnector]:
     host = (data.get("host") or "").strip()
     if not host:
         return None
+    engine = data.get("engine") or "postgresql"
     return {
+        "engine": engine,
         "host": host,
-        "port": data.get("port", "5432"),
+        "port": data.get("port") or ("3306" if engine == "mysql" else "5432"),
         "database": data.get("database", ""),
         "table": data.get("table", ""),
         "username": data.get("username", ""),
@@ -114,13 +117,15 @@ def load_rds_connector() -> Optional[RDSConnector]:
 
 
 def save_rds_connector(
-    host: str, port: str, database: str, table: str, username: str, password: str
+    engine: str, host: str, port: str, database: str, table: str, username: str, password: str
 ) -> None:
+    engine = engine if engine in ("postgresql", "mysql") else "postgresql"
     _save_param(
         RDS_PARAM,
         {
+            "engine": engine,
             "host": host.strip(),
-            "port": port.strip() or "5432",
+            "port": port.strip() or ("3306" if engine == "mysql" else "5432"),
             "database": database.strip(),
             "table": table.strip(),
             "username": username.strip(),

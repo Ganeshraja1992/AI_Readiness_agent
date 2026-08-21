@@ -347,8 +347,9 @@ def save_rds_connector():
         password = existing["password"] if existing else ""
 
     connectors.save_rds_connector(
+        engine=request.form.get("engine", "postgresql"),
         host=host,
-        port=request.form.get("port", "5432"),
+        port=request.form.get("port", ""),
         database=request.form.get("database", ""),
         table=request.form.get("table", ""),
         username=request.form.get("username", ""),
@@ -379,8 +380,9 @@ def _apply_s3_connector(config, connector: connectors.S3Connector) -> None:
 def _apply_rds_connector(config, connector: connectors.RDSConnector) -> None:
     """Point config.rds at the saved connector and switch off mock mode
     since a real database was configured."""
+    config.rds.engine = connector["engine"]
     config.rds.host = connector["host"]
-    config.rds.port = int(connector["port"] or 5432)
+    config.rds.port = int(connector["port"] or (3306 if connector["engine"] == "mysql" else 5432))
     config.rds.database = connector["database"]
     config.rds.table = connector["table"]
     config.rds.username = connector["username"]

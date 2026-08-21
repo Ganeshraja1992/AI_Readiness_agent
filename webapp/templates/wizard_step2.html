@@ -68,7 +68,7 @@
     <h3>Scan RDS database</h3>
     {% if rds_connector %}
       <p class="small-note">
-        Connected to <code>postgresql://{{ rds_connector.host }}:{{ rds_connector.port }}/{{ rds_connector.database }}</code>{% if rds_connector.table %} (table: {{ rds_connector.table }}){% endif %}
+        Connected to <code>{{ rds_connector.engine }}://{{ rds_connector.host }}:{{ rds_connector.port }}/{{ rds_connector.database }}</code>{% if rds_connector.table %} (table: {{ rds_connector.table }}){% endif %}
       </p>
       <form method="post" action="{{ url_for('run_assessment') }}">
         <input type="hidden" name="use_case" value="{{ use_case }}">
@@ -84,33 +84,43 @@
       </form>
       <details style="margin-top: 14px;">
         <summary>Edit connection</summary>
-        <form method="post" action="{{ url_for('save_rds_connector') }}">
+        <form method="post" action="{{ url_for('save_rds_connector') }}" class="rds-connector-form">
           <input type="hidden" name="use_case" value="{{ use_case }}">
           <input type="hidden" name="environment_id" value="{{ environment_id }}">
-          <label for="rds_host">Host</label>
-          <input type="text" id="rds_host" name="host" placeholder="my-db.cluster.rds.amazonaws.com" value="{{ rds_connector.host }}" required>
-          <label for="rds_port">Port</label>
-          <input type="text" id="rds_port" name="port" placeholder="5432" value="{{ rds_connector.port }}">
-          <label for="rds_database">Database</label>
-          <input type="text" id="rds_database" name="database" placeholder="app" value="{{ rds_connector.database }}">
-          <label for="rds_table">Table</label>
-          <input type="text" id="rds_table" name="table" placeholder="customers" value="{{ rds_connector.table }}">
-          <label for="rds_username">Username</label>
-          <input type="text" id="rds_username" name="username" placeholder="readonly_user" value="{{ rds_connector.username }}">
-          <label for="rds_password">Password</label>
-          <input type="password" id="rds_password" name="password" placeholder="leave blank to keep current password">
+          <label for="rds_engine_edit">Database engine</label>
+          <select id="rds_engine_edit" name="engine" class="rds-engine-select">
+            <option value="postgresql" {% if rds_connector.engine == "postgresql" %}selected{% endif %}>PostgreSQL</option>
+            <option value="mysql" {% if rds_connector.engine == "mysql" %}selected{% endif %}>MySQL</option>
+          </select>
+          <label for="rds_host_edit">Host</label>
+          <input type="text" id="rds_host_edit" name="host" placeholder="my-db.cluster.rds.amazonaws.com" value="{{ rds_connector.host }}" required>
+          <label for="rds_port_edit">Port</label>
+          <input type="text" id="rds_port_edit" name="port" class="rds-port-input" placeholder="5432" value="{{ rds_connector.port }}">
+          <label for="rds_database_edit">Database</label>
+          <input type="text" id="rds_database_edit" name="database" placeholder="app" value="{{ rds_connector.database }}">
+          <label for="rds_table_edit">Table</label>
+          <input type="text" id="rds_table_edit" name="table" placeholder="customers" value="{{ rds_connector.table }}">
+          <label for="rds_username_edit">Username</label>
+          <input type="text" id="rds_username_edit" name="username" placeholder="readonly_user" value="{{ rds_connector.username }}">
+          <label for="rds_password_edit">Password</label>
+          <input type="password" id="rds_password_edit" name="password" placeholder="leave blank to keep current password">
           <button type="submit">Save connection</button>
         </form>
       </details>
     {% else %}
-      <p class="small-note">Connect a Postgres/RDS database to scan a sample of rows from a table.</p>
-      <form method="post" action="{{ url_for('save_rds_connector') }}">
+      <p class="small-note">Connect a PostgreSQL or MySQL database to scan a sample of rows from a table.</p>
+      <form method="post" action="{{ url_for('save_rds_connector') }}" class="rds-connector-form">
         <input type="hidden" name="use_case" value="{{ use_case }}">
         <input type="hidden" name="environment_id" value="{{ environment_id }}">
+        <label for="rds_engine">Database engine</label>
+        <select id="rds_engine" name="engine" class="rds-engine-select">
+          <option value="postgresql" selected>PostgreSQL</option>
+          <option value="mysql">MySQL</option>
+        </select>
         <label for="rds_host">Host</label>
         <input type="text" id="rds_host" name="host" placeholder="my-db.cluster.rds.amazonaws.com" required>
         <label for="rds_port">Port</label>
-        <input type="text" id="rds_port" name="port" placeholder="5432" value="5432">
+        <input type="text" id="rds_port" name="port" class="rds-port-input" placeholder="5432" value="5432">
         <label for="rds_database">Database</label>
         <input type="text" id="rds_database" name="database" placeholder="app">
         <label for="rds_table">Table</label>
@@ -122,7 +132,7 @@
         <button type="submit">Save connection</button>
       </form>
     {% endif %}
-    <p class="small-note">Requires AWS credentials in this environment and network access to the database.</p>
+    <p class="small-note">Requires network access from this app to the database (matching security group/port) and, for MySQL, port 3306 open instead of 5432.</p>
   </div>
 
   <div class="sub-section">
@@ -144,5 +154,24 @@
     for that data.
   </p>
 </div>
+
+<script>
+  // Auto-suggest the standard port for the selected engine, without
+  // clobbering a port the user already typed in by hand.
+  (function () {
+    var defaults = { postgresql: "5432", mysql: "3306" };
+    document.querySelectorAll(".rds-connector-form").forEach(function (form) {
+      var select = form.querySelector(".rds-engine-select");
+      var port = form.querySelector(".rds-port-input");
+      if (!select || !port) return;
+      select.addEventListener("change", function () {
+        var known = Object.values(defaults);
+        if (!port.value || known.indexOf(port.value) !== -1) {
+          port.value = defaults[select.value] || port.value;
+        }
+      });
+    });
+  })();
+</script>
 
 {% endblock %}
