@@ -169,7 +169,7 @@ it).
 ## GitHub Actions: CI + auto-deploy to EC2
 
 `.github/workflows/ci-cd.yml` runs `pytest` on every push/PR, and on a
-successful push to `main` redeploys to EC2 instance `i-02dd6db7607e51d84`
+successful push to `main` redeploys to EC2 instance `i-057b3cef11b2ba412`
 over **AWS SSM Send-Command** — no SSH key, no open port 22 needed. The
 instance pulls the latest code, rebuilds the image, and restarts the
 container.
@@ -193,7 +193,7 @@ container.
          "Effect": "Allow",
          "Action": "ssm:SendCommand",
          "Resource": [
-           "arn:aws:ec2:us-east-1:853973692277:instance/i-02dd6db7607e51d84",
+           "arn:aws:ec2:us-east-1:853973692277:instance/i-057b3cef11b2ba412",
            "arn:aws:ssm:us-east-1::document/AWS-RunShellScript"
          ]
        },

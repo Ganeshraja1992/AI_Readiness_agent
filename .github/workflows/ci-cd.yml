@@ -28,7 +28,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     env:
-      INSTANCE_ID: i-02dd6db7607e51d84
+      INSTANCE_ID: i-057b3cef11b2ba412
       APP_DIR: /opt/ai-readiness-agent
     steps:
       - name: Configure AWS credentials
