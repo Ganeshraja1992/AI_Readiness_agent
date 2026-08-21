@@ -39,25 +39,12 @@ class MaskPreviewItem:
 
 
 def mask_value(kind: str, matched: str) -> str:
-    """Redacts a matched PII substring, keeping just enough shape/context
-    to stay useful in a preview (e.g. last 4 digits) without exposing the
-    original value."""
-    if kind == "ssn":
-        digits = re.sub(r"\D", "", matched)
-        return f"***-**-{digits[-4:]}" if len(digits) >= 4 else "***-**-****"
-    if kind == "credit_card":
-        digits = re.sub(r"\D", "", matched)
-        return f"**** **** **** {digits[-4:]}" if len(digits) >= 4 else "**** **** **** ****"
-    if kind == "email":
-        local, _, domain = matched.partition("@")
-        if not domain:
-            return "***@***"
-        visible = local[0] if local else "*"
-        return f"{visible}***@{domain}"
-    if kind == "phone":
-        digits = re.sub(r"\D", "", matched)
-        return f"***-***-{digits[-4:]}" if len(digits) >= 4 else "***-***-****"
-    return "***REDACTED***"
+    """Full redaction: every letter/digit becomes "X", separators
+    (dashes, @, dots, spaces) are kept so the shape stays recognizable --
+    e.g. "123-45-6789" -> "XXX-XX-XXXX", "jane@example.com" ->
+    "XXXX@XXXXXXX.XXX". Nothing from the original value is preserved,
+    unlike a partial mask that keeps the last 4 digits or the domain."""
+    return re.sub(r"[A-Za-z0-9]", "X", matched)
 
 
 def build_preview(profile: DataProfile, source_type: str) -> list[MaskPreviewItem]:
