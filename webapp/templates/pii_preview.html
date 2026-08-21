@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Preview PII Masking — AI Readiness Agent{% endblock %}
+{% block content %}
+
+<p>
+  <a href="{{ url_for('wizard_result', assessment_id=result.assessment_id, stage='remediation') }}">&larr; Back to remediation plan</a>
+</p>
+
+<div class="card">
+  <h2>Preview: mask PII in {{ source_type | upper }} data</h2>
+  {% if source_type == "rds" %}
+  <div class="error-banner" role="alert">
+    This runs real UPDATE statements against your live database. Unlike S3
+    (which has versioning as a safety net), there is <strong>no automatic
+    undo</strong> here — only proceed if you have a backup/snapshot you'd
+    restore from if something needed to be reverted.
+  </div>
+  {% endif %}
+  <p class="small-note">
+    This rewrites the exact values below at the source ({{ source_type | upper }}
+    {{ "rows" if source_type == "rds" else "objects" }}) — nothing has been
+    changed yet. Review every row, then confirm below to apply. This only
+    masks the regex-detected values shown here; it does not touch values
+    Amazon Comprehend flagged that weren't also caught by the regex scan.
+  </p>
+  {% if source_type == "rds" and excluded_count %}
+  <p class="small-note">
+    {{ excluded_count }} additional occurrence{{ "s" if excluded_count != 1 else "" }}
+    excluded — no reliable primary key ("id" column) was found for those
+    rows at scan time, so they can't be safely targeted.
+  </p>
+  {% endif %}
+
+  {% if items %}
+  <div class="table-wrap-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Location</th>
+          <th scope="col">Field</th>
+          <th scope="col">Kind</th>
+          <th scope="col">Current value</th>
+          <th scope="col">After masking</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>{{ item.record_id }}</td>
+          <td>{{ item.field_name }}</td>
+          <td>{{ item.kind }}</td>
+          <td><code>{{ item.matched_value }}</code></td>
+          <td><code>{{ item.masked_value }}</code></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if source_type == "rds" %}
+  <form method="post" action="{{ url_for('pii_mask_apply', assessment_id=result.assessment_id) }}"
+        onsubmit="return confirm('This permanently runs UPDATE statements against {{ items | length }} value(s) in your real, live database. There is NO automatic undo. Continue only if you have a backup/snapshot to fall back on. Continue?');">
+    <input type="hidden" name="source" value="{{ source_type }}">
+    <button type="submit" class="button-secondary">Confirm &amp; mask {{ items | length }} value(s)</button>
+  </form>
+  {% else %}
+  <form method="post" action="{{ url_for('pii_mask_apply', assessment_id=result.assessment_id) }}"
+        onsubmit="return confirm('This permanently rewrites {{ items | length }} value(s) in your real S3 data. The bucket has versioning enabled, so the original is recoverable from S3 version history if needed. Continue?');">
+    <input type="hidden" name="source" value="{{ source_type }}">
+    <button type="submit" class="button-secondary">Confirm &amp; mask {{ items | length }} value(s)</button>
+  </form>
+  {% endif %}
+  {% else %}
+  <p class="empty-state">Nothing to mask — no maskable PII occurrences found for this source.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

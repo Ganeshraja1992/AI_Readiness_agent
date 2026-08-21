@@ -76,11 +76,25 @@
 {% elif stage == "remediation" %}
 <div class="card">
   <h2>6. Generate Remediation Plan</h2>
+  {% if fix_success %}<div class="success-banner" role="status">{{ fix_success }}</div>{% endif %}
+  {% if fix_error %}<div class="error-banner" role="alert">{{ fix_error }}</div>{% endif %}
   {% if result.remediation %}
     {% for r in result.remediation %}
     <div class="remediation">
       <div class="remediation-action">{{ r.action }}</div>
       <div class="remediation-meta">effort: {{ r.effort }} &middot; projected score gain: +{{ r.projected_score_delta }}</div>
+      {% if r.dimension == "security" %}
+      <form method="post" action="{{ url_for('remediate_s3_security', assessment_id=result.assessment_id) }}" class="inline-form"
+            onsubmit="return confirm('This will change real S3 bucket settings (block public access, enable encryption and versioning) on your connected bucket. Continue?');">
+        <button type="submit" class="button-secondary">Apply fix to connected S3 bucket</button>
+      </form>
+      {% endif %}
+      {% if r.dimension == "privacy_risk" %}
+      <div class="button-row">
+        <a class="button-link" href="{{ url_for('pii_mask_preview', assessment_id=result.assessment_id, source='s3') }}">Preview &amp; mask PII in S3 data</a>
+        <a class="button-link" href="{{ url_for('pii_mask_preview', assessment_id=result.assessment_id, source='rds') }}">Preview &amp; mask PII in RDS data</a>
+      </div>
+      {% endif %}
     </div>
     {% endfor %}
   {% else %}

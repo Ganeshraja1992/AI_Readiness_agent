@@ -29,6 +29,23 @@ def scan_text(text: str) -> dict[str, int]:
     return findings
 
 
+def scan_text_detailed(text: str) -> dict[str, list[str]]:
+    """Return the actual matched substrings per PII kind (not just counts)
+    -- used by the PII-masking remediation, which needs to know exactly
+    what to redact. Uses finditer().group(0) rather than findall(): the
+    "phone" pattern has a capturing group, and findall() on a pattern with
+    exactly one group returns that group's text (often empty, since it's
+    optional) instead of the full match."""
+    findings: dict[str, list[str]] = {}
+    if not text:
+        return findings
+    for kind, pattern in PII_PATTERNS.items():
+        matches = [m.group(0) for m in pattern.finditer(text)]
+        if matches:
+            findings[kind] = matches
+    return findings
+
+
 def merge_findings(*finding_dicts: dict[str, int]) -> dict[str, int]:
     merged: dict[str, int] = {}
     for findings in finding_dicts:

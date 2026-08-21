@@ -16,6 +16,24 @@ class FieldProfile(BaseModel):
     sample_values: list[str] = Field(default_factory=list)
 
 
+class PIIOccurrence(BaseModel):
+    """One specific, locatable PII detection -- as opposed to
+    SourceProfile.pii_findings' aggregate counts. Only the regex scanner
+    populates these today (its matches are cleanly tied to one field on one
+    record); Comprehend's findings are detected over a concatenated,
+    cross-record text sample and can't be attributed back to a single
+    field/record the same way, so they stay count-only for now. This is
+    what the PII-masking remediation (webapp) uses to know exactly what to
+    rewrite."""
+
+    source_type: str
+    source_name: str
+    record_id: str  # matches SourceRecord.source_id, e.g. "s3://bucket/key.json"
+    field_name: str
+    kind: str  # "ssn" | "email" | "phone" | "credit_card"
+    matched_value: str  # the actual detected substring -- sensitive, local-audit-only like sample_values
+
+
 class SourceProfile(BaseModel):
     source_type: str
     source_name: str
@@ -24,6 +42,7 @@ class SourceProfile(BaseModel):
     duplicate_rate: float = 0.0
     fields: list[FieldProfile] = Field(default_factory=list)
     pii_findings: dict[str, int] = Field(default_factory=dict)  # kind -> count
+    pii_occurrences: list[PIIOccurrence] = Field(default_factory=list)
     oldest_record_at: datetime | None = None
     newest_record_at: datetime | None = None
     ingestion_errors: list[str] = Field(default_factory=list)

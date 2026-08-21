@@ -495,6 +495,21 @@ details summary:hover { text-decoration: underline; }
 }
 .error-banner::before { content: "\26A0"; font-size: var(--text-md); line-height: 1; }
 
+.success-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  background: color-mix(in srgb, var(--status-good) 10%, var(--surface-1));
+  border: 1px solid var(--status-good-text);
+  color: var(--status-good-text);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  margin-bottom: var(--space-4);
+}
+.success-banner::before { content: "\2713"; font-size: var(--text-md); line-height: 1; }
+
 /* --- Stat tile / hero score --- */
 .hero {
   display: flex;
@@ -768,6 +783,7 @@ details summary:hover { text-decoration: underline; }
 .remediation-meta { color: var(--text-muted); }
 
 /* --- Table of past assessments --- */
+.table-wrap-scroll { overflow-x: auto; margin-bottom: var(--space-4); }
 table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
 th {
   text-align: left;

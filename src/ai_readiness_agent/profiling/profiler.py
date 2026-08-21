@@ -14,8 +14,8 @@ from datetime import datetime
 from ai_readiness_agent.config import ComprehendConfig
 from ai_readiness_agent.ingestion.base import SourceBatch, SourceRecord
 from ai_readiness_agent.profiling import comprehend_pii
-from ai_readiness_agent.profiling.models import DataProfile, FieldProfile, SourceProfile
-from ai_readiness_agent.profiling.pii import merge_findings, scan_text
+from ai_readiness_agent.profiling.models import DataProfile, FieldProfile, PIIOccurrence, SourceProfile
+from ai_readiness_agent.profiling.pii import merge_findings, scan_text_detailed
 
 _NUMERIC_RE = re.compile(r"^-?\d+(\.\d+)?$")
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?)?")
@@ -93,6 +93,26 @@ def profile_source(batch: SourceBatch, comprehend_config: ComprehendConfig | Non
                 field_names.append(k)
 
     pii_findings_total: dict[str, int] = {}
+    pii_occurrences: list[PIIOccurrence] = []
+
+    def _record_occurrences(record: SourceRecord, field_name: str, text: str) -> None:
+        detailed = scan_text_detailed(text)
+        if not detailed:
+            return
+        for kind, matches in detailed.items():
+            pii_findings_total[kind] = pii_findings_total.get(kind, 0) + len(matches)
+            for matched in matches:
+                pii_occurrences.append(
+                    PIIOccurrence(
+                        source_type=batch.source_type,
+                        source_name=batch.source_name,
+                        record_id=record.source_id,
+                        field_name=field_name,
+                        kind=kind,
+                        matched_value=matched,
+                    )
+                )
+
     for name in field_names:
         raw_values = [r.fields.get(name) for r in batch.records]
         non_null = [v for v in raw_values if v not in (None, "")]
@@ -107,20 +127,19 @@ def profile_source(batch: SourceBatch, comprehend_config: ComprehendConfig | Non
         )
         profile.fields.append(fp)
 
-        # PII scan on string-ish fields
-        for v in non_null:
-            if isinstance(v, str):
-                findings = scan_text(v)
-                if findings:
-                    pii_findings_total = merge_findings(pii_findings_total, findings)
+        # PII scan on string-ish fields -- per record, so each detection
+        # can be tied back to exactly which record/field it came from
+        # (see PIIOccurrence) for the PII-masking remediation.
+        for r in batch.records:
+            v = r.fields.get(name)
+            if isinstance(v, str) and v:
+                _record_occurrences(r, name, v)
 
     # documents adapter stashes a larger text sample separately
     for r in batch.records:
         sample = r.fields.get("text_sample")
         if isinstance(sample, str) and sample:
-            findings = scan_text(sample)
-            if findings:
-                pii_findings_total = merge_findings(pii_findings_total, findings)
+            _record_occurrences(r, "text_sample", sample)
 
     # real AWS PII detection (Amazon Comprehend), S3/document sources only
     if comprehend_config and comprehend_config.enabled and batch.source_type in _COMPREHEND_SOURCE_TYPES:
@@ -130,6 +149,7 @@ def profile_source(batch: SourceBatch, comprehend_config: ComprehendConfig | Non
             pii_findings_total = merge_findings(pii_findings_total, comprehend_findings)
 
     profile.pii_findings = pii_findings_total
+    profile.pii_occurrences = pii_occurrences
 
     # --- freshness ----------------------------------------------------
     timestamps: list[datetime] = [r.last_modified for r in batch.records if r.last_modified]

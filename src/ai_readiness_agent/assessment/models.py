@@ -71,6 +71,7 @@ class RemediationAction(BaseModel):
     action: str
     effort: str  # "low" | "medium" | "high"
     projected_score_delta: float
+    dimension: str = ""  # which DimensionScore this came from -- lets the UI attach an "Apply fix" action
 
 
 class AssessmentResult(BaseModel):

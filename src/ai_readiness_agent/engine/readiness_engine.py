@@ -348,6 +348,7 @@ def _remediation(dimension_scores: list[DimensionScore]) -> list[RemediationActi
                 action=_ACTION_BY_DIMENSION.get(d.name, f"Improve {d.name}."),
                 effort=_EFFORT_BY_DIMENSION.get(d.name, "medium"),
                 projected_score_delta=projected_delta,
+                dimension=d.name,
             )
         )
     return actions

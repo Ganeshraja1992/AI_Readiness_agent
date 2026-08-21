@@ -54,6 +54,7 @@ from ai_readiness_agent.config import load_config  # noqa: E402
 from ai_readiness_agent.engine import rules  # noqa: E402
 from ai_readiness_agent.export.csv_report import generate_csv_report  # noqa: E402
 from ai_readiness_agent.export.pdf_report import generate_pdf_report  # noqa: E402
+from ai_readiness_agent.remediation import pii_masking, rds_masking  # noqa: E402
 
 def _resolve_secret_key() -> str:
     """WEBAPP_SECRET_KEY wins if set. Otherwise, persist a generated key to
@@ -585,7 +586,156 @@ def wizard_result(assessment_id: str, stage: str):
         critical_findings=critical_findings,
         payload_json=result.to_control_plane_payload().to_json() if stage == "projected" else None,
         stepper_current_index=2 + idx,
+        fix_success=request.args.get("fix_success"),
+        fix_error=request.args.get("fix_error"),
     )
+
+
+@app.route("/assessment/<assessment_id>/remediate/s3-security", methods=["POST"])
+@login_required
+def remediate_s3_security(assessment_id: str):
+    """Applies the "security" dimension's remediation for real: enables S3
+    Block Public Access, default encryption, and versioning on the
+    currently-connected bucket. Bucket-config only -- never touches object
+    data, so this is safe to automate (unlike PII masking)."""
+    connector = connectors.load_s3_connector()
+    if not connector:
+        return redirect(
+            url_for(
+                "wizard_result", assessment_id=assessment_id, stage="remediation",
+                fix_error="No S3 connector configured -- connect a bucket first.",
+            )
+        )
+
+    import boto3
+
+    client = boto3.client("s3", region_name=connector.get("region") or "us-east-1")
+    checks = [
+        (
+            "public access block",
+            lambda: client.put_public_access_block(
+                Bucket=connector["bucket"],
+                PublicAccessBlockConfiguration={
+                    "BlockPublicAcls": True,
+                    "IgnorePublicAcls": True,
+                    "BlockPublicPolicy": True,
+                    "RestrictPublicBuckets": True,
+                },
+            ),
+        ),
+        (
+            "default encryption",
+            lambda: client.put_bucket_encryption(
+                Bucket=connector["bucket"],
+                ServerSideEncryptionConfiguration={"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]},
+            ),
+        ),
+        (
+            "versioning",
+            lambda: client.put_bucket_versioning(
+                Bucket=connector["bucket"], VersioningConfiguration={"Status": "Enabled"}
+            ),
+        ),
+    ]
+    errors = []
+    for label, fn in checks:
+        try:
+            fn()
+        except Exception as exc:  # noqa: BLE001 - report every failure, don't let one abort the rest
+            errors.append(f"{label}: {exc}")
+
+    if errors:
+        return redirect(
+            url_for(
+                "wizard_result", assessment_id=assessment_id, stage="remediation",
+                fix_error=f"Applied with errors on {connector['bucket']}: " + "; ".join(errors),
+            )
+        )
+    return redirect(
+        url_for(
+            "wizard_result", assessment_id=assessment_id, stage="remediation",
+            fix_success=f"Public access block, encryption, and versioning enabled on {connector['bucket']}.",
+        )
+    )
+
+
+@app.route("/assessment/<assessment_id>/remediate/pii-preview")
+@login_required
+def pii_mask_preview(assessment_id: str):
+    """Read-only: shows exactly what would change before anything is
+    written. No AWS/DB calls here -- the preview is computed purely from
+    the already-completed assessment's stored DataProfile."""
+    result = _load_assessment(assessment_id)
+    if not result:
+        return redirect(url_for("dashboard"))
+
+    source_type = request.args.get("source", "s3")
+    excluded_count = 0
+    if source_type == "rds":
+        items, excluded_count = rds_masking.build_preview(result.data_profile)
+    else:
+        items = pii_masking.build_preview(result.data_profile, source_type)
+
+    return render_template(
+        "pii_preview.html",
+        user=session.get("user"),
+        result=result,
+        source_type=source_type,
+        items=items,
+        excluded_count=excluded_count,
+    )
+
+
+@app.route("/assessment/<assessment_id>/remediate/pii-apply", methods=["POST"])
+@login_required
+def pii_mask_apply(assessment_id: str):
+    """Actually rewrites the S3 objects / RDS rows previewed above.
+    Recomputes the same item list server-side rather than trusting the
+    form (the DataProfile hasn't changed since the preview was shown, so
+    this is deterministic) -- avoids round-tripping sensitive matched
+    values through hidden form fields."""
+    result = _load_assessment(assessment_id)
+    if not result:
+        return redirect(url_for("dashboard"))
+
+    source_type = request.form.get("source", "s3")
+
+    def _err(message: str):
+        return redirect(url_for("wizard_result", assessment_id=assessment_id, stage="remediation", fix_error=message))
+
+    def _ok(message: str):
+        return redirect(url_for("wizard_result", assessment_id=assessment_id, stage="remediation", fix_success=message))
+
+    if source_type == "rds":
+        items, _excluded = rds_masking.build_preview(result.data_profile)
+        if not items:
+            return _err("Nothing to mask -- the preview is now empty.")
+        connector = connectors.load_rds_connector()
+        if not connector:
+            return _err("No RDS connector configured -- connect a database first.")
+        applied, errors = rds_masking.apply_rds_masking(items, connector)
+        if errors and not applied:
+            return _err("RDS masking failed: " + "; ".join(errors))
+        if errors:
+            return _err(f"Masked {applied} row(s), but failed on: " + "; ".join(errors))
+        return _ok(f"Masked {applied} value(s) in {connector['table']} (table {connector['database']}.{connector['table']}).")
+
+    if source_type != "s3":
+        return _err(f"Masking not yet supported for source: {source_type}")
+
+    items = pii_masking.build_preview(result.data_profile, source_type)
+    if not items:
+        return _err("Nothing to mask -- the preview is now empty.")
+
+    connector = connectors.load_s3_connector()
+    region = (connector or {}).get("region") or "us-east-1"
+    applied, errors = pii_masking.apply_s3_masking(items, region)
+
+    if errors and not applied:
+        return _err("Masking failed: " + "; ".join(errors))
+    if errors:
+        return _err(f"Masked {len(applied)} object(s), but failed on: " + "; ".join(errors))
+    return _ok(f"Masked {len(items)} PII value(s) across {len(applied)} S3 object(s): {', '.join(applied)}.")
 
 
 @app.route("/assessment/<assessment_id>")

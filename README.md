@@ -221,6 +221,30 @@ After that, every push to `main` that passes tests redeploys automatically.
 Check progress under the repo's **Actions** tab; the deploy step prints the
 remote script's stdout/stderr either way.
 
+## Remediation: applying fixes, not just reading about them
+
+The "Generate Remediation Plan" wizard stage has two remediation items with
+real "apply this for me" actions, not just descriptive text:
+
+- **Security** — "Apply fix to connected S3 bucket" calls
+  `put_public_access_block`/`put_bucket_encryption`/`put_bucket_versioning`
+  on the currently-connected bucket. Bucket-config only, never touches
+  object data, so this is safe to automate.
+- **Privacy risk (PII masking)** — "Preview & mask PII in S3/RDS data"
+  (`remediation/pii_masking.py`, `remediation/rds_masking.py`) rewrites the
+  *exact* regex-detected PII values in place, always behind a preview step
+  that shows every value and its masked replacement before anything is
+  written. S3 rewrites the object in place (relying on the bucket's
+  versioning, from the fix above, as the undo path); RDS runs one
+  parameterized `UPDATE ... WHERE id = :pk` per row, in its own
+  transaction, and only for rows where a primary key (`id`/`ID` column)
+  was actually found at scan time -- rows without one are excluded and
+  counted, never guessed at. RDS masking has **no automatic undo** the way
+  S3's versioning provides; the preview page says so explicitly.
+  Comprehend-only findings (not also caught by the regex scanner) aren't
+  masked, since they come from a concatenated, cross-record text sample
+  that can't be attributed back to one exact field/row the same way.
+
 ## Running the tests
 
 ```bash
