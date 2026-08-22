@@ -41,6 +41,147 @@ central constraint:
 See **"The local-data boundary"** below for exactly how that's enforced in
 code, not just by convention.
 
+## The problem
+
+Every company wants to use AI. Almost none of them actually know if their
+data is *ready* for it — is it complete? Is it clean? Does it leak PII
+into places it shouldn't? Traditional data audits stop at a report; nobody
+closes the gap, and the same issues resurface next quarter.
+
+## The solution
+
+AI Readiness Agent connects to a company's real AWS data, scores it, and
+tells them exactly what to fix — and for two of those fixes, actually
+fixes it for them, live.
+
+## How it works (the demo/webapp flow)
+
+1. **Connect** — point the app at a real S3 bucket and/or RDS database
+   (no mock data required for the webapp demo).
+2. **Scan** — pick an AI use case, then run a full analysis; because real
+   AWS + LLM calls take real time, a live progress page tracks the stages
+   instead of a frozen spinner.
+3. **Score** — seven weighted dimensions roll up into one overall score
+   and a readiness level (see "Readiness Engine" below).
+4. **Remediate** — apply real fixes for two dimensions directly from the
+   result page (see "Remediation" below), then see the projected score.
+5. **Track** — every run lands on a dashboard with score trends, past
+   assessments, and exportable PDF/CSV reports.
+
+## Core features (built and working today)
+
+- **Seven-dimension scoring** — completeness, uniqueness, volume,
+  freshness, privacy risk, security, and AI content analysis, combined
+  into one weighted overall score (weights vary by use case).
+- **AI-powered content analysis** — an LLM reads sampled content and
+  catches PII buried in free text that a regex or column-level scan would
+  miss entirely (e.g. an SSN typed into a support-ticket description).
+- **Use-case aware weighting** — a customer-support agent weighs privacy
+  risk heavier than a sales-forecasting model does; see
+  `engine/rules.py::USE_CASE_DIMENSION_WEIGHTS`.
+- **Real remediation, not just findings** — see "Remediation" below.
+- **Multi-use-case scorecard** — picking the `general_ai_readiness` use
+  case scores the connected data as a Customer Support Agent today, laid
+  out next to HR Agent, Sales Agent, Document Search, Financial Analyst,
+  and Coding Agent as a visible roadmap (`webapp/templates/wizard_scorecard.html`).
+- **Live progress tracking, dashboard, and exportable reports** — see
+  "Web app" below.
+
+## What's next: feature roadmap
+
+- **Deeper multi-use-case scorecard** — real, tuned scoring (not just the
+  one live row) for HR Agent, Sales Agent, Document Search, Financial
+  Analyst, and Coding Agent.
+- **Native AWS signal integration (opt-in)** — plug into AWS's own
+  emerging data-context layer instead of duplicating it:
+  - **Amazon S3 Metadata** for real-time object discovery.
+  - **Amazon S3 Annotations** to write our readiness verdict back onto
+    objects as queryable business context, so any AI agent or analytics
+    tool reading S3 directly can see it without calling this app.
+  - **S3 Object Lambda** for real-time redaction at read-time, not just
+    at rest.
+
+  None of these three are implemented yet — this repo's existing
+  Comprehend/regex PII pipeline is the only "signal" integration live
+  today. See the architecture diagram below for how they'd fit alongside
+  what already exists.
+
+## Product architecture: connecting the AWS AI data stack
+
+The direction this product is built toward — this diagram mixes what's
+live today (Comprehend, S3/RDS ingestion) with roadmap items called out
+above (S3 Metadata, S3 Annotations, S3 Object Lambda):
+
+```
+AWS services
+├── S3 Metadata      → metadata & discovery              (roadmap)
+├── S3 Annotations   → business/AI context                (roadmap)
+├── Amazon Comprehend → PII detection                      (live)
+├── S3 Object Lambda → transformation/redaction            (roadmap)
+│
+└── THIS PRODUCT
+    → Connects the signals
+    → Understands the AI use case
+    → Determines readiness
+    → Finds gaps
+    → Prioritizes remediation
+    → Calculates projected readiness
+```
+
+The point isn't to compete with AWS's native storage/AI primitives — it's
+to sit on top of them as the layer that turns raw signals into an actual
+readiness decision and a remediation plan.
+
+## Go-to-market: AWS Marketplace first
+
+The local-data boundary above isn't just a compliance detail — it's the GTM
+story. This tool never asks a customer's raw data to leave their own AWS
+account; it scores S3/RDS in place using native AWS services (Amazon
+Comprehend, Amazon Bedrock) already running there. That makes **AWS
+Marketplace** a natural first channel, not just a distribution option:
+
+- **Instant distribution** to AWS's existing customer base, no cold
+  outbound motion required.
+- **Frictionless procurement** — buyers pay through their existing AWS
+  bill, and skip the usual new-vendor security review, since no data ever
+  has to leave their environment for this tool to work.
+- **Built-in enterprise trust** — passing AWS Marketplace's security and
+  foundational technical review is a credibility signal before a sales
+  conversation even starts.
+- **AWS co-sell eligible** — ISV Accelerate / co-sell programs put AWS's
+  own account teams in front of enterprise buyers already spending with
+  AWS.
+- **Private offers** for enterprise-negotiated pricing/terms without
+  building custom contracting infrastructure.
+- **Usage-based pricing** (per assessment / per GB scanned) maps directly
+  onto AWS Marketplace's native metering.
+
+Two listing shapes fit this repo as-is: a hosted **SaaS subscription** for
+buyers who want zero infrastructure, or a **container/AMI product** for
+buyers who require the scan to run entirely inside their own VPC — the
+same Docker image this repo's CI/CD pipeline already builds (see below) is
+the deployable artifact for the latter.
+
+### Expansion path: beyond AWS
+
+Nothing in the **Readiness Engine** (`engine/`) or the **Data Profile**
+model is AWS-specific — every AWS touchpoint is isolated to the ingestion
+adapters (`ingestion/s3_adapter.py`, `ingestion/rds_adapter.py`) and the
+optional Comprehend/Bedrock calls in `profiling/`. So the GTM sequence
+extends cloud-by-cloud without a rewrite:
+
+1. **AWS Marketplace** (live) — S3, RDS, Amazon Comprehend / Bedrock.
+2. **Azure Marketplace** (next) — a `BlobAdapter` / `AzureSqlAdapter`
+   behind the same `DataSourceAdapter` contract; Azure AI Language
+   replaces Comprehend for the managed PII pass.
+3. **Google Cloud Marketplace** (planned) — a `GcsAdapter` /
+   `CloudSqlAdapter`; Cloud DLP replaces Comprehend.
+
+See "Ingestion adapters" below for how the existing S3/RDS adapters keep
+real and mock code paths side by side behind one interface — a new cloud's
+adapter follows the same pattern, so the scoring/remediation logic never
+has to know which cloud it's running against.
+
 ## Quick start
 
 ```bash
@@ -182,32 +323,33 @@ container.
    S3/DynamoDB/SSM-parameter/Comprehend policy from the EC2 deployment
    guide above.
 
-2. **Create an IAM user for GitHub Actions** with this policy (least
-   privilege: only `ssm:SendCommand` on this one instance + the
-   `AWS-RunShellScript` document, plus read-only status checks):
-   ```json
-   {
-     "Version": "2012-10-17",
-     "Statement": [
-       {
-         "Effect": "Allow",
-         "Action": "ssm:SendCommand",
-         "Resource": [
-           "arn:aws:ec2:us-east-1:853973692277:instance/i-057b3cef11b2ba412",
-           "arn:aws:ssm:us-east-1::document/AWS-RunShellScript"
-         ]
-       },
-       {
-         "Effect": "Allow",
-         "Action": ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"],
-         "Resource": "*"
-       }
-     ]
-   }
-   ```
-   Create an access key for that user, then add two **repository secrets**
-   in GitHub (Settings → Secrets and variables → Actions):
-   `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+2. **Authenticate GitHub Actions via OIDC, not a long-lived IAM user.**
+   The live pipeline (`.github/workflows/ci-cd.yml`) uses
+   `aws-actions/configure-aws-credentials` with `role-to-assume:
+   ${{ vars.AWS_DEPLOY_ROLE_ARN }}` and `permissions: id-token: write` —
+   no `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` secrets at all (this
+   also happens to be the only option in a sandbox account whose SCPs
+   block `iam:CreateUser`/`CreateAccessKey`). One-time setup:
+   - Create an IAM OIDC identity provider for
+     `token.actions.githubusercontent.com` (skip if one already exists in
+     the account).
+   - Create a deploy role trusting that provider, scoped to this repo's
+     `sub` claim (`repo:<owner>/<repo>:ref:refs/heads/main`), with an
+     inline policy granting only `ssm:SendCommand` on this instance's ARN
+     + the `AWS-RunShellScript` document ARN, plus unrestricted (not
+     resource-scopable) `ssm:GetCommandInvocation` /
+     `ssm:ListCommandInvocations`.
+   - Add that role's ARN as a **repository variable** (not secret — it's
+     not sensitive) named `AWS_DEPLOY_ROLE_ARN`.
+
+   Gotcha worth knowing before debugging an `AssumeRoleWithWebIdentity`
+   `AccessDenied`: some GitHub orgs now send the `sub` claim with
+   immutable numeric owner/repo IDs
+   (`repo:<owner>@<ownerId>/<repo>@<repoId>:ref:...`) instead of the
+   plain name form. If the plain-name trust condition gets rejected,
+   check CloudTrail's `AssumeRoleWithWebIdentity` event for the actual
+   `sub` value GitHub sent, and add both forms to the trust policy's
+   `StringLike` condition.
 
 3. **Place a real `.env.docker` on the instance once**, at
    `/opt/ai-readiness-agent/.env.docker` (same format as
@@ -258,7 +400,7 @@ authentication), and — most importantly — a compliance test that asserts
 raw record values never make it into the payload that crosses the Secure
 Result Channel.
 
-## Architecture
+## Code architecture
 
 ```
 src/ai_readiness_agent/
@@ -327,13 +469,15 @@ newest record).
 
 ### Readiness Engine
 
-`engine/readiness_engine.py` scores five dimensions — completeness,
-uniqueness, volume, freshness, privacy_risk — and combines them into an
-overall 0-100 score, weighted by the selected **use case**
+`engine/readiness_engine.py` scores seven dimensions — completeness,
+uniqueness, volume, freshness, privacy_risk, security, and
+ai_content_analysis — and combines them into an overall 0-100 score,
+weighted by the selected **use case**
 (`engine/rules.py::USE_CASE_DIMENSION_WEIGHTS`). A customer-support agent
-that touches PII weights `privacy_risk` at 0.30; a sales-forecasting model
-weights `volume` at 0.30 instead. Unknown use cases fall back to a
-balanced default.
+that touches PII weights `privacy_risk` at 0.25 (vs. a flat 0.20 default);
+a sales-forecasting model weights `volume` at 0.20 instead (vs. 0.10
+default). Unknown use cases — including `general_ai_readiness`, the
+default — fall back to the flat, balanced weight set.
 
 It also produces:
 - **findings** — one per issue detected (sparse field, duplicate rate,
