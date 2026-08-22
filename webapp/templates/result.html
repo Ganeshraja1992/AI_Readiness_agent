@@ -13,7 +13,7 @@
 <div class="card hero">
   <div class="hero-figure">{{ result.overall_score | round | int }}</div>
   <div class="hero-meta">
-    <div class="label">Overall readiness score &middot; use case: {{ result.use_case }} &middot; env: {{ result.environment_id }}</div>
+    <div class="label">Overall readiness score &middot; use case: {{ result.use_case | use_case_label }} &middot; env: {{ result.environment_id }}</div>
     <span class="badge badge-{{ result.readiness_level.value | readiness_badge }}">
       <span class="dot"></span>{{ result.readiness_level.value }}
     </span>

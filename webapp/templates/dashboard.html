@@ -101,7 +101,7 @@
       {% for a in assessments %}
       <tr>
         <td><a href="{{ url_for('view_assessment', assessment_id=a.assessment_id) }}" aria-label="View assessment {{ a.assessment_id }}">{{ a.assessment_id[:8] }}&hellip;</a></td>
-        <td>{{ a.use_case }}</td>
+        <td>{{ a.use_case | use_case_label }}</td>
         <td>{{ a.environment_id }}</td>
         <td>{{ a.overall_score }}</td>
         <td>

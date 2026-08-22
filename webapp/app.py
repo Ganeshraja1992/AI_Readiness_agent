@@ -53,6 +53,7 @@ from ai_readiness_agent import audit_store  # noqa: E402
 from ai_readiness_agent.agent import AIReadinessAgent  # noqa: E402
 from ai_readiness_agent.config import load_config  # noqa: E402
 from ai_readiness_agent.engine import rules  # noqa: E402
+from ai_readiness_agent.engine.readiness_engine import DEFAULT_USE_CASE  # noqa: E402
 from ai_readiness_agent.export.csv_report import generate_csv_report  # noqa: E402
 from ai_readiness_agent.export.pdf_report import generate_pdf_report  # noqa: E402
 from ai_readiness_agent.remediation import pii_masking, rds_masking  # noqa: E402
@@ -229,6 +230,13 @@ def dimension_label(name: str) -> str:
     return name.replace("_", " ").title().replace("Ai ", "AI ")
 
 
+@app.template_filter("use_case_label")
+def use_case_label_filter(use_case: str) -> str:
+    if use_case == DEFAULT_USE_CASE:
+        return "General AI Readiness (multi-use-case scorecard)"
+    return use_case.replace("_", " ").title()
+
+
 @app.template_filter("severity_tier")
 def severity_tier_filter(score: float) -> str:
     return _severity_tier(score)
@@ -245,8 +253,6 @@ def level_tier_filter(level: str) -> str:
 
 
 def _use_case_choices() -> list[str]:
-    from ai_readiness_agent.engine.readiness_engine import DEFAULT_USE_CASE
-
     choices = sorted(rules.USE_CASE_DIMENSION_WEIGHTS.keys())
     if DEFAULT_USE_CASE not in choices:
         choices.append(DEFAULT_USE_CASE)
@@ -633,11 +639,16 @@ def run_assessment():
         daemon=True,
     ).start()
 
+    if use_case == DEFAULT_USE_CASE:
+        result_url_template = url_for("wizard_scorecard", assessment_id="__ID__")
+    else:
+        result_url_template = url_for("wizard_result", assessment_id="__ID__", stage=RESULT_STAGES[0])
+
     return render_template(
         "scan_progress.html",
         user=session.get("user"),
         job_id=job_id,
-        result_url_template=url_for("wizard_result", assessment_id="__ID__", stage=RESULT_STAGES[0]),
+        result_url_template=result_url_template,
         connect_url=url_for("wizard_step2", use_case=use_case, environment_id=environment_id),
     )
 
@@ -686,6 +697,35 @@ def wizard_result(assessment_id: str, stage: str):
         stepper_current_index=2 + idx,
         fix_success=request.args.get("fix_success"),
         fix_error=request.args.get("fix_error"),
+    )
+
+
+_SOURCE_TYPE_LABELS = {"s3": "S3", "rds": "RDS", "documents": "Documents"}
+_SCORECARD_COMING_SOON_USE_CASES = ("HR Agent", "Sales Agent", "Document Search", "Financial Analyst", "Coding Agent")
+
+
+@app.route("/wizard/scorecard/<assessment_id>")
+@login_required
+def wizard_scorecard(assessment_id: str):
+    """Multi-use-case readiness scorecard, shown instead of the normal
+    single-use-case wizard_result flow when the customer picks the
+    "General AI Readiness" option -- one real, computed row (this demo's
+    data maps to a customer-support scenario) plus the roadmap of other
+    personas not built out yet."""
+    result = _load_assessment(assessment_id)
+    if not result:
+        return redirect(url_for("dashboard"))
+
+    data_types = sorted(
+        {_SOURCE_TYPE_LABELS.get(s.source_type, s.source_type) for s in result.data_profile.sources}
+    )
+
+    return render_template(
+        "wizard_scorecard.html",
+        user=session.get("user"),
+        result=result,
+        data_types=", ".join(data_types) if data_types else "—",
+        coming_soon_use_cases=_SCORECARD_COMING_SOON_USE_CASES,
     )
 
 
@@ -840,6 +880,8 @@ def pii_mask_apply(assessment_id: str):
 @login_required
 def view_assessment(assessment_id: str):
     result = _load_assessment(assessment_id)
+    if result and result.use_case == DEFAULT_USE_CASE:
+        return redirect(url_for("wizard_scorecard", assessment_id=assessment_id))
     if not result:
         assessments = audit_store.list_audits(_config())
         return render_template(

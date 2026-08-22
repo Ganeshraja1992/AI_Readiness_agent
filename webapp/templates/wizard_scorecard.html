@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}AI Use Case Readiness Scorecard — AI Readiness Agent{% endblock %}
+{% block content %}
+
+<div class="card hero">
+  <div class="hero-figure">{{ result.overall_score | round | int }}</div>
+  <div class="hero-meta">
+    <div class="label">AI Use Case Readiness Scorecard &middot; env: {{ result.environment_id }}</div>
+    <span class="badge badge-{{ result.readiness_level.value | readiness_badge }}">
+      <span class="dot"></span>{{ result.readiness_level.value }}
+    </span>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Readiness by AI use case</h2>
+  <p class="small-note">
+    One score, scored against how each type of AI application would actually use this data.
+    The rest are on the roadmap.
+  </p>
+  <div class="table-wrap-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">AI use case</th>
+          <th scope="col">Data type(s)</th>
+          <th scope="col">Readiness score</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Customer Support Agent</td>
+          <td>{{ data_types }}</td>
+          <td>
+            <span class="badge badge-{{ result.readiness_level.value | readiness_badge }}">
+              <span class="dot"></span>{{ result.overall_score | round | int }} &middot; {{ result.readiness_level.value }}
+            </span>
+          </td>
+        </tr>
+        {% for uc in coming_soon_use_cases %}
+        <tr>
+          <td>{{ uc }}</td>
+          <td>&mdash;</td>
+          <td><span class="badge badge-info"><span class="dot"></span>Coming soon</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="wizard-nav">
+  <a href="{{ url_for('wizard_step2') }}">&larr; Back to connect data</a>
+  <span>
+    <a href="{{ url_for('wizard_result', assessment_id=result.assessment_id, stage='analyze') }}">View full assessment detail</a>
+    &middot;
+    <a class="button-link" href="{{ url_for('dashboard') }}">Finish</a>
+  </span>
+</div>
+
+{% endblock %}

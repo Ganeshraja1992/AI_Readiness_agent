@@ -10,7 +10,7 @@
     <label for="use_case">AI use case</label>
     <select id="use_case" name="use_case">
       {% for uc in use_cases %}
-        <option value="{{ uc }}" {% if uc == default_use_case %}selected{% endif %}>{{ uc }}</option>
+        <option value="{{ uc }}" {% if uc == default_use_case %}selected{% endif %}>{{ uc | use_case_label }}</option>
       {% endfor %}
     </select>
 
